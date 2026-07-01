@@ -307,14 +307,13 @@ button{font-family:var(--font); cursor:pointer}
 <div id="app"><!-- rendered by JS --></div>
 
 <!-- ============================================================================
-     ZAJEDNIČKA LOGIKA — inline (poslovnice + kod + pravila igre).
+     LOGIKA — inline (poslovnice + kod + pravila igre).
      Namjerno je INLINE (nije <script src="...">) da aplikacija radi kad se
      datoteka otvori direktno / kroz preglednik koji ne učitava vanjske skripte.
-     Ako mijenjaš popis poslovnica, promijeni ISTI blok i u radnik.html.
      ========================================================================= -->
 <script>
 "use strict";
-/* ---- POSLOVNICE (jedini izvor; isto i u radnik.html) -------------------- */
+/* ---- POSLOVNICE (jedini izvor) ----------------------------------------- */
 const FF_COUNTRIES = [
   { code:"HR", label:"CRO", name:"Croatia", flag:"🇭🇷", venues:[
     { id:"kvatric",        name:"FF Kvatrić",        city:"Zagreb" },
@@ -359,17 +358,20 @@ function ffFlag(code){
   return `<svg class="flagsvg" viewBox="0 0 24 16" width="24" height="16" aria-hidden="true">${F[code]||""}</svg>`;
 }
 
-/* ---- DNEVNI KOD (isto i u radnik.html) ---------------------------------- */
+/* ---- KOD PO POSLOVNICI (fiksan cijelo ljeto) ----------------------------
+   Jedan kod po igraonici, isti od 1.7. do 31.8. Radnik ga upisuje na igračevom
+   mobitelu; igrač ga nikad ne vidi. Deterministički iz (tajni ključ|poslovnica)
+   → 4-znamenkasti (1000–9999). */
 const FF_CODE_SECRET = "FF-SUMMER-FLAME-2026";
 function ffDateStr(d){ const x=d||new Date(); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`; }
 function ffToday(){ return ffDateStr(new Date()); }
-function ffDailyCode(venueId,dateStr){
-  const s=`${FF_CODE_SECRET}|${venueId}|${dateStr||ffToday()}`;
+function ffVenueCode(venueId){
+  const s=`${FF_CODE_SECRET}|${venueId}`;
   let h=0x811c9dc5;
   for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; }
-  return String(h%10000).padStart(4,"0");
+  return String(1000 + (h%9000));
 }
-function ffCheckCode(venueId,input,dateStr){ const c=String(input||"").replace(/\D/g,""); return c.length===4 && c===ffDailyCode(venueId,dateStr); }
+function ffCheckCode(venueId,input){ const c=String(input||"").replace(/\D/g,""); return c.length===4 && c===ffVenueCode(venueId); }
 
 /* ---- PRAVILA IGRE (kampanja, pečati, bodovi) ---------------------------- */
 const FF_CAMPAIGN = { start:"2026-07-01", end:"2026-08-31" };
@@ -860,12 +862,12 @@ function recordSheet(){
   return `<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet">
     <div class="grip"></div>
     <h3>Record today's visit</h3>
-    <p class="sh-sub">Enter today's arcade code.</p>
+    <p class="sh-sub">Enter your arcade's code.</p>
     <input class="code-in" id="codeIn" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" />
     <div class="errline" id="codeErr"></div>
     <div class="worker-note">
       <span class="wi">📱</span>
-      <div class="wt"><b>Hand your phone to a staff member</b> so they can type today's code. The code is not read out loud.</div>
+      <div class="wt"><b>Hand your phone to a staff member</b> so they can type the code. The code is not read out loud.</div>
     </div>
     <div class="lan-toggle">
       <div><div class="lt2">I'm playing with a squad</div><div class="ls">Came with friends? Turn on for the orange stamp.</div></div>
@@ -957,7 +959,7 @@ function confirmCode(){
   const t=ffToday();
   const code=el("codeIn").value.trim();
   if(REC.lan && !REC.team){ el("codeErr").textContent="Pick your squad size first."; return; }
-  if(!ffCheckCode(S.venueId, code, t)){
+  if(!ffCheckCode(S.venueId, code)){
     el("codeIn").classList.add("err");
     el("codeErr").textContent="Wrong code. Check with a staff member.";
     return;
