@@ -438,6 +438,62 @@ function save(){
   catch(e){ return false; }   // npr. anonimni/private mod ili puna memorija
 }
 
+/* ---------- Supabase (živi zajednički leaderboard) --------------------------
+   "Brzi live": mobitel igrača upisuje SVOJ rezultat u zajedničku bazu. Ključ je
+   PUBLISHABLE (namijenjen da bude javan; štite ga RLS pravila). Sve preko fetch()
+   REST API-ja — bez vanjskog SDK-a, ostaje sve inline. -------------------------- */
+const SB_URL = "https://ihpeqafzhecqoqfwkzam.supabase.co";
+const SB_KEY = "sb_publishable_svm4lcaPRYWDAUbkEvr9cQ_w_x53-ww";
+const SB_ON  = !!(SB_URL && SB_KEY);
+const SB_HEADERS = { "apikey": SB_KEY, "Authorization": "Bearer "+SB_KEY, "Content-Type": "application/json" };
+
+/* Stabilni anonimni id ovog uređaja/putovnice — ključ reda u bazi. */
+function ffNewId(){
+  try{ if(window.crypto && crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+  return "p-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,10);
+}
+
+/* Blagi filter nadimaka za javni prikaz (osnovno; ozbiljna moderacija = ručno). */
+const SB_BADWORDS = ["kurac","kurča","pičk","pizd","pičan","jebo","jebi","jeben","kurv","šupak","supak","govno","sranje","fuck","shit","bitch","cunt","nigg","fag","penis","kita"];
+function cleanName(n){
+  const s = String(n||"").slice(0,24).trim() || "Player";
+  const low = s.toLowerCase();
+  for(const w of SB_BADWORDS){ if(low.includes(w)) return "Player"; }
+  return s;
+}
+
+/* Pošalji svoj trenutni rezultat u bazu (fire-and-forget; offline = tiho).
+   Šalje SAMO kad ima ≥1 bod → igrač se pojavi na ljestvici tek kad krene skupljati. */
+async function pushScore(){
+  if(!SB_ON || !S || !S.venueId || !S.playerId) return;
+  const score = myLiveScore();
+  if(score <= 0) return;
+  try{
+    await fetch(`${SB_URL}/rest/v1/scores`, {
+      method: "POST",
+      headers: { ...SB_HEADERS, "Prefer": "resolution=merge-duplicates" },
+      body: JSON.stringify({
+        player_id: S.playerId,
+        nickname: cleanName(S.name),
+        venue_id: S.venueId,
+        score: score,
+        updated_at: new Date().toISOString()
+      })
+    });
+  }catch(e){ /* offline/greška — ljestvica se svejedno napuni pri idućem otvaranju */ }
+}
+async function sbPlayers(venueId){
+  const url = `${SB_URL}/rest/v1/scores?venue_id=eq.${encodeURIComponent(venueId)}&select=player_id,nickname,score&order=score.desc,updated_at.asc&limit=100`;
+  const r = await fetch(url, { headers: SB_HEADERS });
+  if(!r.ok) throw new Error("http "+r.status);
+  return await r.json();
+}
+async function sbAll(){
+  const r = await fetch(`${SB_URL}/rest/v1/scores?select=player_id,nickname,venue_id,score`, { headers: SB_HEADERS });
+  if(!r.ok) throw new Error("http "+r.status);
+  return await r.json();
+}
+
 /* ---------- utils ---------- */
 const el = (id)=>document.getElementById(id);
 function fmtDateLong(dstr){ const d=ffParse(dstr); return `${EN_MON[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; }
@@ -454,6 +510,7 @@ function flameSVG(){ return '<svg viewBox="0 0 24 24" fill="currentColor" aria-h
 function render(){
   S = load();
   if(!S || !S.name){ renderCover(); return; }
+  if(!S.playerId){ S.playerId = ffNewId(); save(); }   // migracija starih putovnica
   if(!S.venueId){ renderPicker(); return; }
   renderApp();
 }
@@ -477,7 +534,7 @@ function renderCover(){
   const go = ()=>{
     const name = nick.value.trim();
     if(!name){ nick.focus(); nick.style.borderColor="var(--bad)"; return; }
-    S = { version:1, name, passportNo:genPassportNo(), venueId:null, createdAt:ffToday(), days:{} };
+    S = { version:1, name, passportNo:genPassportNo(), playerId:ffNewId(), venueId:null, createdAt:ffToday(), days:{} };
     save();
     const c = el("cover"); c.classList.add("gone");
     setTimeout(renderPicker, 520);
@@ -549,6 +606,7 @@ function renderApp(){
   wireTabs();
   wireSheet();
   wireSettings();
+  pushScore();            // sinkroniziraj svoj rezultat pri otvaranju
 }
 
 function settingsSheet(){
@@ -916,6 +974,7 @@ function confirmCode(){
   showSuccess(rec);
   // pri sljedećem otvaranju / re-renderu pečat je već tu
   buildPages();
+  pushScore();            // javi novi rezultat u zajednički leaderboard
   buildLeaderboard();
 }
 
@@ -945,12 +1004,9 @@ function showSuccess(rec){
    uključi živi zajednički feed (backend), ovdje se ubacuju i ostali igrači. */
 function myLiveScore(){ return S ? ffScore(S.days).total : 0; }
 
+let lbToken = 0;
 function buildLeaderboard(){
   const view=el("view-lb"); if(!view) return;
-  const venOpts = FF_COUNTRIES.map(c=>`<optgroup label="${c.flag} ${c.label} · ${c.name}">${
-    c.venues.map(v=>`<option value="${v.id}" ${v.id===LB_VENUE?"selected":""}>${esc(v.name)}</option>`).join("")
-  }</optgroup>`).join("");
-
   view.innerHTML = `<div class="lb">
     <div class="seg">
       <button data-m="players" class="${LB_MODE==="players"?"on":""}">Players</button>
@@ -959,14 +1015,52 @@ function buildLeaderboard(){
     <div id="lbBody"></div>
   </div>`;
   view.querySelectorAll(".seg button").forEach(b=> b.onclick=()=>{ LB_MODE=b.dataset.m; buildLeaderboard(); });
+  renderLbBody();
+}
 
-  const body=el("lbBody");
+/* Puni tijelo ljestvice: žive podatke iz Supabasea (ako uspije), inače lokalno.
+   Uvijek spaja TVOJ živi rezultat pa se vidiš i offline / prije nego sync stigne. */
+async function renderLbBody(){
+  const body=el("lbBody"); if(!body) return;
+  const myId = S ? S.playerId : null;
   const myScore = myLiveScore();
+  const venOpts = FF_COUNTRIES.map(c=>`<optgroup label="${c.flag} ${c.label} · ${c.name}">${
+    c.venues.map(v=>`<option value="${v.id}" ${v.id===LB_VENUE?"selected":""}>${esc(v.name)}</option>`).join("")
+  }</optgroup>`).join("");
+  const venHeader = `<select class="vsel" id="vsel">${venOpts}</select>`;
+  const wireSel = ()=>{ const sel=el("vsel"); if(sel) sel.onchange=(e)=>{ LB_VENUE=e.target.value; buildLeaderboard(); }; };
+
+  if(SB_ON){
+    body.innerHTML = (LB_MODE==="venues"?"":venHeader) +
+      `<div class="lb-empty"><div class="lb-empty-i">⏳</div><div class="lb-empty-t">Loading…</div></div>`;
+    wireSel();
+  }
+
+  const token = ++lbToken;
+  let live=false, players=[], venues=[];
+  if(SB_ON){
+    try{
+      if(LB_MODE==="venues"){
+        const all = await sbAll();
+        const map={};
+        for(const r of all){ (map[r.venue_id] || (map[r.venue_id]={venue_id:r.venue_id,total:0})).total += (r.score||0); }
+        venues = Object.values(map);
+      } else {
+        players = await sbPlayers(LB_VENUE);
+      }
+      live=true;
+    }catch(e){ live=false; }
+  }
+  if(token!==lbToken) return;   // novija je pretekla ovu
 
   if(LB_MODE==="venues"){
-    // Samo FF Arene sa stvarnim bodovima. Bez zajedničkog feeda to je jedino
-    // tvoja arena (kad imaš bodove). Ostale se pojave kad krene živi sync.
-    const rows = (myScore>0 && S.venueId) ? [{ ...ffVenueById(S.venueId), total: myScore }] : [];
+    if(myScore>0 && S.venueId){
+      const mine = venues.find(v=>v.venue_id===S.venueId);
+      if(mine){ mine.total = Math.max(mine.total, myScore); } else { venues.push({venue_id:S.venueId, total:myScore}); }
+    }
+    const rows = venues.filter(v=>v.total>0)
+      .map(v=>({ ...(ffVenueById(v.venue_id)||{id:v.venue_id,name:v.venue_id,city:"",country:"HR"}), total:v.total }))
+      .sort((a,b)=>b.total-a.total);
     if(!rows.length){
       body.innerHTML = lbEmpty("No FF Arena has points yet",
         "As players start collecting stamps, arenas climb here. Best FF Arena on Aug 31 wins 1 week of 50% off.");
@@ -974,13 +1068,16 @@ function buildLeaderboard(){
     }
     body.innerHTML = `<div class="lb-title">🏆 FF Arenas this summer · best one wins 1 week of 50% off</div>` +
       rows.map((v,i)=>rankRow(i+1, `${ffFlag(v.country)} ${esc(v.name)}`, esc(v.city), v.total, v.id===S.venueId, i===0?"🏟️ 50% off":"")).join("") +
-      lbNote();
+      lbNote(live);
   } else {
-    // Igrači u odabranoj areni. Lokalno samo TI (u svojoj areni, kad imaš bodove).
-    const list = (LB_VENUE===S.venueId && myScore>0) ? [{ name:S.name, score:myScore, me:true }] : [];
+    let list = players.map(p=>({ id:p.player_id, name:p.nickname, score:p.score, me:(p.player_id===myId) }));
+    if(LB_VENUE===S.venueId && myScore>0){
+      list = list.filter(p=>p.id!==myId);
+      list.push({ id:myId, name:S.name, score:myScore, me:true });
+    }
+    list = list.filter(p=>p.score>0).sort((a,b)=> (b.score-a.score) || ((b.me?1:0)-(a.me?1:0)));
     const ven=ffVenueById(LB_VENUE);
-    const header = `<select class="vsel" id="vsel">${venOpts}</select>
-       <div class="lb-title">${ven?ffFlag(ven.country)+" "+esc(ven.name):""} · top players · Aug 31 prizes shown</div>`;
+    const header = venHeader + `<div class="lb-title">${ven?ffFlag(ven.country)+" "+esc(ven.name):""} · top players · Aug 31 prizes shown</div>`;
     if(!list.length){
       body.innerHTML = header + lbEmpty(
         LB_VENUE===S.venueId ? "No points here yet — be the first!" : "No players here yet",
@@ -989,9 +1086,9 @@ function buildLeaderboard(){
     } else {
       body.innerHTML = header +
         list.map((p,i)=>{ const h=ffPlayerPrizeHours(i+1); return rankRow(i+1, esc(p.name)+(p.me?" (you)":""), "", p.score, !!p.me, h?`🏆 ${h}h`:""); }).join("") +
-        lbNote();
+        lbNote(live);
     }
-    el("vsel").onchange=(e)=>{ LB_VENUE=e.target.value; buildLeaderboard(); };
+    wireSel();
   }
 }
 function rankRow(pos,name,sub,score,me,prize){
@@ -1012,8 +1109,10 @@ function lbEmpty(title, sub){
     <div class="lb-empty-s">${esc(sub)}</div>
   </div>`;
 }
-function lbNote(){
-  return `<div class="lb-note">Only your own passport is stored on this phone, so for now you see just your live score. A shared leaderboard across all players turns on when live sync is enabled.</div>`;
+function lbNote(live){
+  return live
+    ? `<div class="lb-note">🔴 Live — updates as Friendly Fire players everywhere collect points. Prizes are handed out in the arcade.</div>`
+    : `<div class="lb-note">You're offline — showing your own live score. The shared leaderboard updates when you're back online.</div>`;
 }
 
 /* ---------- toast ---------- */
