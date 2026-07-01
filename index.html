@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Summer Flame — Friendly Fire</title>
+<meta name="theme-color" content="#0a0d16" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Summer Flame" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Cinzel:wght@600;700&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#0a0d16; --bg2:#0f1424; --panel:#141b2e; --panel2:#1a2440;
+  --line:#26314f; --line2:#32406a;
+  --text:#f3efe3; --muted:#9aa6c0; --muted2:#6b779a;
+  --gold:#e9c46a; --gold2:#f7e2a6; --gold-deep:#b8892b;
+  --stamp-yellow:#f5c542; --stamp-orange:#ff7a1a; --stamp-red:#ff3b3b;
+  --accent:#3da0ff; --accent-deep:#0e63c9;
+  --good:#34d399; --bad:#ff6b6b;
+  --r:16px; --r2:12px;
+  --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,system-ui,sans-serif;
+  --disp:'Rajdhani',var(--font);
+  --serif:'Cinzel',Georgia,'Times New Roman',serif;
+  --fire:linear-gradient(120deg,#ffb020 0%,#ff5a2c 48%,#ff2e63 100%);
+  --shadow:0 18px 50px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font); color:var(--text);
+  background:radial-gradient(1200px 700px at 50% -10%,#141d33,#0a0d16 60%);
+  min-height:100vh; min-height:100dvh; overflow:hidden;
+}
+#app{
+  max-width:480px; margin:0 auto; height:100vh; height:100dvh;
+  display:flex; flex-direction:column; position:relative; overflow:hidden;
+}
+button{font-family:var(--font); cursor:pointer}
+.hidden{display:none !important}
+
+/* ---------- COVER / ONBOARDING ---------- */
+.cover{
+  position:absolute; inset:0; z-index:40; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; padding:calc(34px + env(safe-area-inset-top)) 26px calc(34px + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(120% 80% at 50% 0%,rgba(233,196,106,.10),transparent 55%),
+    linear-gradient(160deg,#12172a 0%,#0a0d16 55%,#070a12 100%);
+  transition:transform .7s cubic-bezier(.7,0,.2,1),opacity .5s ease;
+}
+.cover.gone{transform:perspective(1400px) rotateY(-118deg); transform-origin:left center; opacity:0; pointer-events:none}
+.cover::after{content:"";position:absolute;top:0;bottom:0;left:12px;width:3px;
+  background:linear-gradient(180deg,transparent,rgba(233,196,106,.35),transparent)}
+.crest{width:112px;height:112px;margin-bottom:18px;filter:drop-shadow(0 6px 20px rgba(233,196,106,.35))}
+.cover .brand{font-family:var(--serif);letter-spacing:.14em;font-weight:700;
+  font-size:15px;color:var(--gold);text-align:center;opacity:.92}
+.cover .title{font-family:var(--serif);font-weight:700;font-size:38px;line-height:1.05;
+  text-align:center;margin:6px 0 2px;
+  background:linear-gradient(180deg,var(--gold2),var(--gold) 45%,var(--gold-deep));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  text-shadow:0 2px 14px rgba(233,196,106,.18)}
+.cover .sub{color:var(--muted);font-size:13px;letter-spacing:.05em;margin-bottom:30px;text-align:center}
+.cover .passport-word{font-family:var(--serif);color:rgba(233,196,106,.55);font-size:11px;
+  letter-spacing:.42em;margin-top:26px;text-transform:uppercase}
+.field{width:100%;max-width:320px}
+.field label{display:block;font-size:12px;color:var(--muted);margin:0 0 8px 2px;letter-spacing:.04em}
+.input{
+  width:100%;background:rgba(255,255,255,.04);border:1px solid var(--line2);
+  color:var(--text);border-radius:var(--r2);padding:15px 16px;font-size:17px;
+  font-family:var(--disp);letter-spacing:.02em;outline:none;
+}
+.input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(233,196,106,.14)}
+.btn{
+  width:100%;border:none;border-radius:var(--r2);padding:16px;font-size:15px;font-weight:700;
+  letter-spacing:.06em;font-family:var(--disp);color:#1a1204;margin-top:14px;
+  background:linear-gradient(180deg,var(--gold2),var(--gold-deep));
+  box-shadow:0 10px 26px rgba(233,196,106,.22);
+}
+.btn:active{transform:scale(.98)}
+.btn.ghost{background:rgba(255,255,255,.05);color:var(--text);border:1px solid var(--line2);box-shadow:none}
+.btn:disabled{opacity:.45;box-shadow:none}
+.btn.fire{background:var(--fire);color:#fff;box-shadow:0 12px 30px rgba(255,90,44,.32)}
+
+/* venue picker */
+.picker{position:absolute;inset:0;z-index:41;background:linear-gradient(160deg,#12172a,#0a0d16);
+  display:flex;flex-direction:column}
+.picker .phead{padding:calc(22px + env(safe-area-inset-top)) 22px 8px}
+.picker h2{font-family:var(--serif);color:var(--gold);margin:0;font-size:22px}
+.picker p{color:var(--muted);font-size:13px;margin:6px 0 0}
+.picker .plist{flex:1;overflow-y:auto;padding:10px 16px 20px}
+.country{margin-top:14px}
+.country .chead{display:flex;align-items:center;gap:10px;padding:6px 6px 8px}
+.country .flag{font-size:22px}
+.flagsvg{border-radius:3px;box-shadow:0 0 0 1px rgba(255,255,255,.14);display:inline-block;vertical-align:middle;flex:none}
+.country .clabel{font-family:var(--disp);font-weight:700;letter-spacing:.12em;font-size:15px}
+.country .cname{color:var(--muted2);font-size:12px}
+.venue{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:14px 15px;border:1px solid var(--line);border-radius:var(--r2);
+  background:var(--panel);margin-bottom:8px;
+}
+.venue.sel{border-color:var(--gold);background:linear-gradient(180deg,rgba(233,196,106,.12),rgba(233,196,106,.03))}
+.venue .vn{font-weight:600;font-size:15px}
+.venue .vc{color:var(--muted);font-size:12px;margin-top:2px}
+.venue .radio{width:20px;height:20px;border-radius:50%;border:2px solid var(--line2);flex:none}
+.venue.sel .radio{border-color:var(--gold);background:radial-gradient(circle at 50% 50%,var(--gold) 40%,transparent 45%)}
+.picker .pfoot{padding:12px 16px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--bg2)}
+
+/* ---------- MAIN ---------- */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+  border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--bg2),rgba(15,20,36,.4))
+}
+.topbar .bl{display:flex;align-items:center;gap:9px}
+.topbar .bcrest{width:26px;height:26px}
+.topbar .bt{font-family:var(--serif);color:var(--gold);font-size:14px;letter-spacing:.06em;line-height:1}
+.topbar .bt small{display:block;color:var(--muted2);font-family:var(--font);font-size:10px;letter-spacing:.14em;margin-top:2px}
+.topbar .pagettl{font-family:var(--disp);font-weight:700;font-size:13px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.topbar .rgt{display:flex;align-items:center;gap:10px}
+.iconbtn{background:transparent;border:none;color:var(--muted2);padding:6px;border-radius:9px;display:grid;place-items:center}
+.iconbtn:active{background:rgba(255,255,255,.06)}
+.iconbtn svg{width:20px;height:20px}
+
+.viewwrap{flex:1;position:relative;overflow:hidden}
+.view{position:absolute;inset:0;display:flex;flex-direction:column}
+.view.off{display:none}
+
+/* pager */
+.pager{flex:1;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;
+  scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
+.pager::-webkit-scrollbar{display:none}
+.page{min-width:100%;scroll-snap-align:center;overflow-y:auto;padding:16px 16px 18px}
+.page::-webkit-scrollbar{display:none}
+.dots{display:flex;justify-content:center;gap:6px;padding:8px 0 6px;background:var(--bg2)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--line2);transition:.2s}
+.dot.on{background:var(--gold);width:18px;border-radius:6px}
+
+/* cards */
+.card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+  border-radius:var(--r);padding:16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+.card+.card{margin-top:12px}
+.card .edge{position:absolute;left:0;right:0;top:0;height:2px;background:var(--fire);opacity:.7}
+.eyebrow{font-family:var(--disp);letter-spacing:.14em;text-transform:uppercase;font-size:11px;color:var(--muted2)}
+
+/* Danas */
+.today-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.who .nm{font-family:var(--disp);font-weight:700;font-size:24px;line-height:1.1}
+.who .pno{color:var(--gold);font-size:12px;letter-spacing:.12em;font-family:var(--disp);margin-top:3px}
+.who .vv{color:var(--muted);font-size:12px;margin-top:4px}
+.score{text-align:right;flex:none}
+.score .v{font-family:var(--disp);font-weight:700;font-size:40px;line-height:.9;
+  background:linear-gradient(180deg,var(--gold2),var(--gold-deep));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.score .l{font-size:10px;color:var(--muted2);letter-spacing:.16em;text-transform:uppercase}
+.date-chip{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:7px 12px;border-radius:999px;
+  background:rgba(255,255,255,.04);border:1px solid var(--line2);font-size:12px;color:var(--muted);font-family:var(--disp);letter-spacing:.04em}
+.record-btn{margin-top:14px}
+.today-stamps{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.mini-stamp{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;border:1px dashed var(--line2);color:var(--muted);font-size:12.5px}
+.mini-stamp.got{border-style:solid;color:var(--text)}
+.mini-stamp .sdot{width:14px;height:14px;border-radius:50%}
+.quests{margin-top:6px}
+.quest{display:flex;gap:11px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.quest:last-child{border-bottom:none}
+.quest .qi{width:30px;height:30px;border-radius:9px;flex:none;display:grid;place-items:center;background:rgba(255,255,255,.05);border:1px solid var(--line2)}
+.quest .qt{font-size:13.5px;font-weight:600}
+.quest .qs{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+.quest .qs b{color:var(--text)}
+.reward-note{font-size:13px;line-height:1.55;color:var(--muted)}
+.reward-note b{color:var(--gold2)}
+.bar{height:7px;border-radius:99px;background:#0d1830;border:1px solid var(--line);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--fire);border-radius:99px;transition:width .5s}
+
+/* legend / rewards */
+.legend-row{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line)}
+.legend-row:last-child{border-bottom:none}
+.stamp{width:46px;height:46px;flex:none;border-radius:50%;display:grid;place-items:center;position:relative;
+  border:2px solid currentColor;box-shadow:0 0 0 3px rgba(255,255,255,.02) inset}
+.stamp svg{width:26px;height:26px}
+.stamp .rot{position:absolute;inset:-2px;border-radius:50%;border:2px dashed currentColor;opacity:.35}
+.lg-y{color:var(--stamp-yellow)} .lg-o{color:var(--stamp-orange)} .lg-r{color:var(--stamp-red)}
+.legend-row .lt{font-weight:700;font-size:14px}
+.legend-row .ld{font-size:12px;color:var(--muted);margin-top:3px}
+.reward{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px}
+.reward:last-child{border-bottom:none}
+.reward .rv{color:var(--gold);font-family:var(--disp);font-weight:600;text-align:right;flex:none}
+
+/* week page */
+.week-head{display:flex;justify-content:space-between;align-items:baseline}
+.week-head .wn{font-family:var(--disp);font-weight:700;font-size:22px}
+.week-head .wr{font-size:11px;color:var(--muted);letter-spacing:.04em}
+.week-pts{font-family:var(--disp);color:var(--gold);font-weight:700;font-size:15px}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-top:14px}
+.day{aspect-ratio:1/1.15;border:1px solid var(--line);border-radius:11px;background:var(--panel);
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:6px 2px;position:relative}
+.day.out{opacity:.28}
+.day.today{border-color:var(--gold);box-shadow:0 0 0 2px rgba(233,196,106,.2)}
+.day .dow{font-size:9px;color:var(--muted2);letter-spacing:.06em;text-transform:uppercase}
+.day .dn{font-family:var(--disp);font-weight:700;font-size:14px;margin-top:1px}
+.day .st{display:flex;gap:2px;margin-top:auto;padding-bottom:2px}
+.day .st b{width:8px;height:8px;border-radius:50%;display:block}
+.week-red{margin-top:12px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.week-reward{margin-top:8px;font-size:12.5px;padding:10px 12px;border-radius:10px;
+  background:rgba(233,196,106,.08);border:1px solid rgba(233,196,106,.25);color:var(--gold2)}
+
+/* ---------- LEADERBOARD ---------- */
+.lb{flex:1;overflow-y:auto;padding:16px 16px 18px}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px;gap:4px;margin-bottom:14px}
+.seg button{flex:1;border:none;background:transparent;color:var(--muted);font-family:var(--disp);font-weight:700;
+  letter-spacing:.06em;font-size:13px;padding:9px;border-radius:999px}
+.seg button.on{background:var(--fire);color:#fff}
+.vsel{width:100%;-webkit-appearance:none;appearance:none;background:var(--panel);border:1px solid var(--line2);
+  color:var(--text);border-radius:var(--r2);padding:12px 40px 12px 14px;font-size:16px;font-family:var(--disp);margin-bottom:14px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%239aa6c0' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 14px center}
+.lb-title{display:flex;align-items:center;gap:8px;margin:2px 2px 12px;font-size:13px;color:var(--muted)}
+.rank{display:flex;align-items:center;gap:12px;padding:12px 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:8px}
+.rank.me{border-color:var(--gold);background:linear-gradient(180deg,rgba(233,196,106,.12),rgba(233,196,106,.03))}
+.rank .pos{font-family:var(--disp);font-weight:700;font-size:18px;width:30px;text-align:center;color:var(--muted)}
+.rank.top1 .pos{color:#ffd54a} .rank.top2 .pos{color:#cdd6ea} .rank.top3 .pos{color:#e6a86b}
+.rank .rn{flex:1;font-weight:600;font-size:14px}
+.rank .rn small{display:block;color:var(--muted2);font-size:11px;font-weight:500;margin-top:1px}
+.rank .rp{font-family:var(--disp);font-weight:700;color:var(--gold);font-size:16px}
+.rank .prize{font-family:var(--disp);font-size:10.5px;font-weight:700;color:var(--gold2);background:rgba(233,196,106,.12);border:1px solid rgba(233,196,106,.3);padding:3px 7px;border-radius:999px;margin-right:8px;white-space:nowrap}
+.rank .medal{font-size:16px}
+.lb-note{margin-top:10px;font-size:11px;color:var(--muted2);line-height:1.5;text-align:center;padding:0 8px}
+
+/* ---------- BOTTOM NAV ---------- */
+.tabbar{display:flex;border-top:1px solid var(--line);background:var(--bg2);
+  padding-bottom:env(safe-area-inset-bottom)}
+.tabbar button{flex:1;border:none;background:transparent;color:var(--muted2);
+  padding:11px 0 10px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:600;letter-spacing:.03em}
+.tabbar button svg{width:23px;height:23px}
+.tabbar button.on{color:var(--gold)}
+.tabbar button.on svg{filter:drop-shadow(0 0 8px rgba(233,196,106,.5))}
+
+/* ---------- RECORD SHEET ---------- */
+.sheet-bg{position:absolute;inset:0;z-index:60;background:rgba(4,6,12,.72);backdrop-filter:blur(3px);
+  display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .25s}
+.sheet-bg.on{opacity:1;pointer-events:auto}
+.sheet{width:100%;background:linear-gradient(180deg,var(--panel2),var(--panel));border-top:1px solid var(--line2);
+  border-radius:22px 22px 0 0;padding:8px 20px calc(22px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s cubic-bezier(.2,.8,.2,1);box-shadow:0 -20px 60px rgba(0,0,0,.6);
+  max-height:92dvh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sheet-bg.on .sheet{transform:translateY(0)}
+.grip{width:44px;height:5px;border-radius:99px;background:var(--line2);margin:8px auto 16px}
+.sheet h3{font-family:var(--disp);font-size:20px;margin:0 0 4px;font-weight:700}
+.sheet .sh-sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+.code-in{width:100%;text-align:center;font-family:var(--disp);font-weight:700;font-size:38px;letter-spacing:.5em;
+  padding:16px 0 16px .5em;background:rgba(0,0,0,.25);border:1px solid var(--line2);border-radius:14px;color:var(--text);outline:none}
+.code-in:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(233,196,106,.14)}
+.code-in.err{border-color:var(--bad);animation:shake .35s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+.worker-note{display:flex;gap:10px;align-items:center;margin-top:14px;padding:13px 14px;border-radius:12px;
+  background:linear-gradient(90deg,rgba(61,160,255,.12),rgba(61,160,255,.04));border:1px solid rgba(61,160,255,.3)}
+.worker-note .wi{font-size:22px;flex:none}
+.worker-note .wt{font-size:13px;line-height:1.4}
+.worker-note .wt b{color:var(--accent)}
+.errline{color:var(--bad);font-size:12.5px;margin-top:8px;min-height:16px;text-align:center}
+.lan-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:16px;
+  padding:13px 14px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.lan-toggle .lt2{font-size:13.5px;font-weight:600}
+.lan-toggle .ls{font-size:11.5px;color:var(--muted);margin-top:2px}
+.switch{width:48px;height:28px;border-radius:99px;background:var(--line2);position:relative;flex:none;transition:.2s;border:none}
+.switch.on{background:var(--stamp-orange)}
+.switch b{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.2s}
+.switch.on b{left:23px}
+.team{margin-top:12px;overflow:hidden;transition:.25s;max-height:0;opacity:0}
+.team.on{max-height:180px;opacity:1}
+.team .tl{font-size:12px;color:var(--muted);margin-bottom:8px}
+.team-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}
+.team-grid button{border:1px solid var(--line2);background:var(--panel);color:var(--text);border-radius:10px;
+  padding:10px 0;font-family:var(--disp);font-weight:700;font-size:16px}
+.team-grid button.on{background:var(--stamp-orange);border-color:var(--stamp-orange);color:#1a1204}
+.team .tp{text-align:center;font-size:12px;color:var(--stamp-orange);margin-top:8px;font-family:var(--disp);min-height:16px}
+
+/* success */
+.success-bg{position:absolute;inset:0;z-index:70;background:rgba(4,6,12,.9);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;opacity:0;pointer-events:none;transition:opacity .3s;padding:30px}
+.success-bg.on{opacity:1;pointer-events:auto}
+.big-stamp{width:150px;height:150px;border-radius:50%;display:grid;place-items:center;position:relative;
+  color:var(--stamp-yellow);border:4px solid currentColor;transform:scale(0) rotate(-25deg)}
+.success-bg.on .big-stamp{animation:slam .6s cubic-bezier(.2,1.4,.4,1) forwards}
+@keyframes slam{0%{transform:scale(2.4) rotate(-28deg);opacity:0}55%{transform:scale(.86) rotate(-10deg);opacity:1}100%{transform:scale(1) rotate(-7deg);opacity:1}}
+.big-stamp svg{width:78px;height:78px}
+.big-stamp .rot{position:absolute;inset:-4px;border-radius:50%;border:3px dashed currentColor;opacity:.4}
+.success-bg h2{font-family:var(--serif);color:var(--gold);margin:22px 0 4px;font-size:26px}
+.success-bg p{color:var(--muted);font-size:14px;margin:0;text-align:center}
+.success-bg .pts{margin-top:10px;font-family:var(--disp);font-weight:700;font-size:15px;color:var(--stamp-orange)}
+.spark{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--gold);opacity:0}
+.success-bg.on .spark{animation:spark .8s ease-out forwards}
+@keyframes spark{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.2)}}
+
+.toast{position:absolute;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);z-index:80;
+  background:var(--panel2);border:1px solid var(--line2);color:var(--text);padding:11px 16px;border-radius:12px;
+  font-size:13px;opacity:0;transition:.25s;pointer-events:none;box-shadow:var(--shadow);max-width:88%;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div id="app"><!-- rendered by JS --></div>
+
+<!-- ============================================================================
+     ZAJEDNIČKA LOGIKA — inline (poslovnice + kod + pravila igre).
+     Namjerno je INLINE (nije <script src="...">) da aplikacija radi kad se
+     datoteka otvori direktno / kroz preglednik koji ne učitava vanjske skripte.
+     Ako mijenjaš popis poslovnica, promijeni ISTI blok i u radnik.html.
+     ========================================================================= -->
+<script>
+"use strict";
+/* ---- POSLOVNICE (jedini izvor; isto i u radnik.html) -------------------- */
+const FF_COUNTRIES = [
+  { code:"HR", label:"CRO", name:"Croatia", flag:"🇭🇷", venues:[
+    { id:"kvatric",        name:"FF Kvatrić",        city:"Zagreb" },
+    { id:"dubrava",        name:"FF Dubrava",        city:"Zagreb" },
+    { id:"point",          name:"FF Point",          city:"Zagreb" },
+    { id:"osijek",         name:"FF Osijek",         city:"Osijek" },
+    { id:"slavonski-brod", name:"FF Slavonski Brod", city:"Slavonski Brod" },
+    { id:"split",          name:"FF Split",          city:"Split" },
+    { id:"split-joker",    name:"FF Split Joker",    city:"Split" },
+    { id:"zadar",          name:"FF Zadar",          city:"Zadar" },
+    { id:"koprivnica",     name:"FF Koprivnica",     city:"Koprivnica" },
+  ]},
+  { code:"BA", label:"BIH", name:"Bosnia & Herzegovina", flag:"🇧🇦", venues:[
+    { id:"mepas",      name:"FF Mepas Mall", city:"Mostar" },
+    { id:"zenica",     name:"FF Zenica",     city:"Zenica" },
+    { id:"sarajevo",   name:"FF Sarajevo",   city:"Sarajevo" },
+    { id:"banja-luka", name:"FF Banja Luka", city:"Banja Luka" },
+    { id:"tuzla",      name:"FF Tuzla",      city:"Tuzla" },
+  ]},
+  { code:"AT", label:"AUT", name:"Austria", flag:"🇦🇹", venues:[
+    { id:"millennium-city", name:"FF Millennium City", city:"Beč" },
+    { id:"lugner-city",     name:"FF Lugner City",     city:"Beč" },
+  ]},
+  { code:"SI", label:"SLO", name:"Slovenia", flag:"🇸🇮", venues:[
+    { id:"ljubljana", name:"FF Ljubljana", city:"Ljubljana" },
+    { id:"maribor",   name:"FF Maribor",   city:"Maribor" },
+  ]},
+  { code:"NL", label:"NED", name:"Netherlands", flag:"🇳🇱", venues:[
+    { id:"alexandrium", name:"FF Alexandrium", city:"Rotterdam" },
+  ]},
+];
+function ffAllVenues(){ const out=[]; for(const c of FF_COUNTRIES) for(const v of c.venues) out.push({...v,country:c.code,countryName:c.name,flag:c.flag,label:c.label}); return out; }
+function ffVenueById(id){ return ffAllVenues().find(v=>v.id===id)||null; }
+function ffFlag(code){
+  const F={
+    HR:'<rect width="24" height="16" fill="#fff"/><rect width="24" height="5.34" fill="#d81e05"/><rect y="10.66" width="24" height="5.34" fill="#0f1a8a"/>',
+    AT:'<rect width="24" height="16" fill="#fff"/><rect width="24" height="5.34" fill="#ed2939"/><rect y="10.66" width="24" height="5.34" fill="#ed2939"/>',
+    SI:'<rect width="24" height="16" fill="#fff"/><rect y="5.34" width="24" height="5.34" fill="#005da4"/><rect y="10.66" width="24" height="5.34" fill="#ed1c24"/>',
+    NL:'<rect width="24" height="16" fill="#fff"/><rect width="24" height="5.34" fill="#ae1c28"/><rect y="10.66" width="24" height="5.34" fill="#21468b"/>',
+    BA:'<rect width="24" height="16" fill="#002395"/><polygon points="7,0 22,0 22,16" fill="#fecb00"/><g fill="#fff"><circle cx="11" cy="4" r="1"/><circle cx="14" cy="8" r="1"/><circle cx="17" cy="12" r="1"/></g>',
+  };
+  return `<svg class="flagsvg" viewBox="0 0 24 16" width="24" height="16" aria-hidden="true">${F[code]||""}</svg>`;
+}
+
+/* ---- DNEVNI KOD (isto i u radnik.html) ---------------------------------- */
+const FF_CODE_SECRET = "FF-SUMMER-FLAME-2026";
+function ffDateStr(d){ const x=d||new Date(); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`; }
+function ffToday(){ return ffDateStr(new Date()); }
+function ffDailyCode(venueId,dateStr){
+  const s=`${FF_CODE_SECRET}|${venueId}|${dateStr||ffToday()}`;
+  let h=0x811c9dc5;
+  for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; }
+  return String(h%10000).padStart(4,"0");
+}
+function ffCheckCode(venueId,input,dateStr){ const c=String(input||"").replace(/\D/g,""); return c.length===4 && c===ffDailyCode(venueId,dateStr); }
+
+/* ---- PRAVILA IGRE (kampanja, pečati, bodovi) ---------------------------- */
+const FF_CAMPAIGN = { start:"2026-07-01", end:"2026-08-31" };
+function ffParse(s){ const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
+function ffFmt(dt){ return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`; }
+function ffAddDays(dt,n){ const x=new Date(dt); x.setDate(x.getDate()+n); return x; }
+function ffDayDiff(a,b){ return Math.round((ffParse(b)-ffParse(a))/86400000); }
+function ffInCampaign(dateStr){ return dateStr>=FF_CAMPAIGN.start && dateStr<=FF_CAMPAIGN.end; }
+function ffCampaignWeeks(){
+  const start=ffParse(FF_CAMPAIGN.start), end=ffParse(FF_CAMPAIGN.end);
+  const firstMon=ffAddDays(start,-((start.getDay()+6)%7));
+  const weeks=[]; let ws=firstMon;
+  while(ws<=end){
+    const we=ffAddDays(ws,6);
+    weeks.push({ mondayStart:ffFmt(ws), start:ffFmt(ws<start?start:ws), end:ffFmt(we>end?end:we) });
+    ws=ffAddDays(ws,7);
+  }
+  if(weeks.length>1){ const last=weeks[weeks.length-1]; if(ffDayDiff(last.start,last.end)<=0){ weeks[weeks.length-2].end=last.end; weeks.pop(); } }
+  return weeks.map((w,i)=>({index:i+1,...w}));
+}
+function ffLanPoints(team){ const t=Number(team)||0; return t<2?0:(t-1)*2; }  // svaka dodatna osoba = +2
+function ffRedPoints(run){ const r=Number(run)||0; if(r>=7) return 15; if(r>=5) return 10; if(r>=3) return 3; return 0; }  // 3d→+3, 5d→+10, 7d→+15
+function ffMaxRun(days,start,end){
+  let best=0,cur=0,d=ffParse(start); const endD=ffParse(end);
+  while(d<=endD){ const k=ffFmt(d); if(days[k]&&days[k].visit){ cur++; if(cur>best) best=cur; } else cur=0; d=ffAddDays(d,1); }
+  return best;
+}
+function ffScore(days){
+  days=days||{}; let visitPts=0,lanPts=0,redPts=0,visitCount=0,lanCount=0;
+  for(const k of Object.keys(days)){ const rec=days[k]; if(!rec||!rec.visit) continue; visitPts++; visitCount++; if(rec.lanTeam){ lanPts+=ffLanPoints(rec.lanTeam); lanCount++; } }
+  const perWeekRed={}; let bestStreak=0;
+  for(const w of ffCampaignWeeks()){ const run=ffMaxRun(days,w.start,w.end); if(run>bestStreak) bestStreak=run; perWeekRed[w.index]=ffRedPoints(run); redPts+=perWeekRed[w.index]; }
+  return { total:visitPts+lanPts+redPts, visitPts,lanPts,redPts,visitCount,lanCount,bestStreak,perWeekRed };
+}
+function ffWeekPoints(days,week){
+  days=days||{}; let p=0,d=ffParse(week.start); const endD=ffParse(week.end);
+  while(d<=endD){ const rec=days[ffFmt(d)]; if(rec&&rec.visit){ p+=1; if(rec.lanTeam) p+=ffLanPoints(rec.lanTeam); } d=ffAddDays(d,1); }
+  return p+ffRedPoints(ffMaxRun(days,week.start,week.end));
+}
+// Svakih 10 bodova = 1 sat igranja (na kraju tjedna).
+function ffWeeklyRewardHours(points){ return Math.floor((Number(points)||0)/10); }
+// Nagrade na kraju ljeta (31.8.) za top 10 igrača: 1.→10h ... 10.→1h.
+function ffPlayerPrizeHours(rank){ return (rank>=1 && rank<=10) ? (11-rank) : 0; }
+</script>
+
+<script>
+/* ============================================================================
+   Summer Flame — igračeva aplikacija
+   ========================================================================== */
+"use strict";
+
+const STORE_KEY = "ff_summer_flame_player_v1";
+const EN_DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const EN_MON = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+let S = null;             // player store
+let VIEW = "passport";    // "passport" | "leaderboard"
+let LB_MODE = "players";  // "players" | "venues"
+let LB_VENUE = null;      // venue id shown in leaderboard
+let REC = { lan:false, team:null }; // record-sheet temp state
+
+/* ---------- persistence ---------- */
+function load(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)); }catch(e){ return null; } }
+function save(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); return true; }
+  catch(e){ return false; }   // npr. anonimni/private mod ili puna memorija
+}
+
+/* ---------- utils ---------- */
+const el = (id)=>document.getElementById(id);
+function fmtDateLong(dstr){ const d=ffParse(dstr); return `${EN_MON[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; }
+function dowIdx(dstr){ return (ffParse(dstr).getDay()+6)%7; } // Mon=0
+function genPassportNo(){ return "FF-"+String(Math.floor(100000+Math.random()*899999)); }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+/* flame stamp svg (colored by currentColor) */
+function flameSVG(){ return '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c1 3.2-.6 4.6-2 6.2C8.3 10.2 7 12 7 14.2A5 5 0 0 0 17 14.4c0-1.7-.8-3-1.7-4.2-.3 1-1 1.7-1.9 1.9.8-2.2.6-5-1.4-7.1-.3-.3-.6-.6-1-1z"/></svg>'; }
+
+/* =====================================================================
+   RENDER ROOT
+   ===================================================================== */
+function render(){
+  S = load();
+  if(!S || !S.name){ renderCover(); return; }
+  if(!S.venueId){ renderPicker(); return; }
+  renderApp();
+}
+
+/* ---------- COVER ---------- */
+function renderCover(){
+  el("app").innerHTML = `
+  <div class="cover" id="cover">
+    <div class="brand">FRIENDLY FIRE</div>
+    ${crestSVG(112)}
+    <div class="title">Summer<br/>Flame</div>
+    <div class="sub">Summer passport · 2026</div>
+    <div class="field">
+      <label>Your nickname or name</label>
+      <input class="input" id="nick" placeholder="e.g. Blitzy" autocomplete="off" maxlength="24" />
+      <button class="btn" id="openBtn">Open passport</button>
+    </div>
+    <div class="passport-word">Passport</div>
+  </div>`;
+  const nick = el("nick");
+  const go = ()=>{
+    const name = nick.value.trim();
+    if(!name){ nick.focus(); nick.style.borderColor="var(--bad)"; return; }
+    S = { version:1, name, passportNo:genPassportNo(), venueId:null, createdAt:ffToday(), days:{} };
+    save();
+    const c = el("cover"); c.classList.add("gone");
+    setTimeout(renderPicker, 520);
+  };
+  el("openBtn").onclick = go;
+  nick.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
+  setTimeout(()=>nick.focus(),400);
+}
+
+/* ---------- VENUE PICKER ---------- */
+/* preselect: id trenutne poslovnice (kod "Promijeni poslovnicu"); čuva pečate. */
+function renderPicker(preselect){
+  const changing = !!preselect;
+  let groups = FF_COUNTRIES.map(c=>`
+    <div class="country">
+      <div class="chead">${ffFlag(c.code)}
+        <span class="clabel">${c.label}</span><span class="cname">${c.name}</span></div>
+      ${c.venues.map(v=>`
+        <div class="venue ${v.id===preselect?"sel":""}" data-id="${v.id}">
+          <div><div class="vn">${esc(v.name)}</div><div class="vc">${esc(v.city)}</div></div>
+          <div class="radio"></div>
+        </div>`).join("")}
+    </div>`).join("");
+
+  el("app").innerHTML = `
+  <div class="picker">
+    <div class="phead"><h2>Where do you play?</h2>
+      <p>${changing?"Change your arcade. Your stamps and points stay saved.":"Pick your Friendly Fire arcade. This is where you collect stamps and appear on the leaderboard."}</p></div>
+    <div class="plist">${groups}</div>
+    <div class="pfoot"><button class="btn" id="confirmVenue" ${preselect?"":"disabled"}>Confirm arcade</button></div>
+  </div>`;
+
+  let chosen=preselect||null;
+  document.querySelectorAll(".venue").forEach(v=>{
+    v.onclick=()=>{
+      document.querySelectorAll(".venue").forEach(x=>x.classList.remove("sel"));
+      v.classList.add("sel"); chosen=v.dataset.id;
+      el("confirmVenue").disabled=false;
+    };
+  });
+  el("confirmVenue").onclick=()=>{
+    if(!chosen) return;
+    S.venueId=chosen; LB_VENUE=chosen; save(); renderApp();
+  };
+}
+
+/* =====================================================================
+   MAIN APP
+   ===================================================================== */
+function renderApp(){
+  if(!LB_VENUE) LB_VENUE=S.venueId;
+  el("app").innerHTML = `
+    ${topbar()}
+    <div class="viewwrap">
+      <div class="view ${VIEW==="passport"?"":"off"}" id="view-pass">
+        <div class="pager" id="pager"></div>
+        <div class="dots" id="dots"></div>
+      </div>
+      <div class="view ${VIEW==="leaderboard"?"":"off"}" id="view-lb"></div>
+    </div>
+    ${tabbar()}
+    ${recordSheet()}
+    ${settingsSheet()}
+    ${successOverlay()}
+    <div class="toast" id="toast"></div>
+  `;
+  buildPages();
+  buildLeaderboard();
+  wireTabs();
+  wireSheet();
+  wireSettings();
+}
+
+function settingsSheet(){
+  const v=ffVenueById(S.venueId);
+  return `<div class="sheet-bg" id="settingsBg"><div class="sheet">
+    <div class="grip"></div>
+    <h3>Settings</h3>
+    <p class="sh-sub">Passport: <b>${esc(S.name)}</b> · ${esc(S.passportNo)}<br/>${v?ffFlag(v.country)+" "+esc(v.name):""}</p>
+    <button class="btn ghost" id="setChangeVenue">Change arcade</button>
+    <button class="btn ghost" id="setReset" style="margin-top:8px;color:var(--bad);border-color:rgba(255,107,107,.4)">Reset passport</button>
+    <button class="btn ghost" id="setClose" style="margin-top:8px">Close</button>
+  </div></div>`;
+}
+function wireSettings(){
+  el("gearBtn").onclick=()=>el("settingsBg").classList.add("on");
+  el("setClose").onclick=()=>el("settingsBg").classList.remove("on");
+  el("settingsBg").onclick=(e)=>{ if(e.target===el("settingsBg")) el("settingsBg").classList.remove("on"); };
+  el("setChangeVenue").onclick=()=>{ el("settingsBg").classList.remove("on"); renderPicker(S.venueId); };
+  el("setReset").onclick=()=>{
+    if(confirm("Reset passport? All your stamps and points will be deleted. This can't be undone.")){
+      localStorage.removeItem(STORE_KEY); S=null; VIEW="passport"; render();
+    }
+  };
+}
+
+function crestSVG(sz){
+  return `<svg class="crest" width="${sz}" height="${sz}" viewBox="0 0 100 100" fill="none">
+    <circle cx="50" cy="50" r="46" stroke="url(#gg)" stroke-width="2.5"/>
+    <circle cx="50" cy="50" r="40" stroke="url(#gg)" stroke-width="1" opacity=".5"/>
+    <path d="M50 24c3 7-1.4 10-4.6 13.6C41.6 41.8 39 45.6 39 50.6a11 11 0 0 0 22 .4c0-3.7-1.8-6.6-3.8-9.2-.7 2.3-2.2 3.8-4.2 4.3 1.8-4.8 1.3-11-3-15.5-.6-.7-1.4-1.4-2-2.6z" fill="url(#gf)"/>
+    <defs>
+      <linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f7e2a6"/><stop offset="1" stop-color="#b8892b"/></linearGradient>
+      <linearGradient id="gf" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffd76a"/><stop offset="1" stop-color="#ff5a2c"/></linearGradient>
+    </defs>
+  </svg>`;
+}
+function topbar(){
+  const ttl = VIEW==="leaderboard" ? "Leaderboard" : "Passport";
+  return `<div class="topbar">
+    <div class="bl">${crestSVG(26).replace('class="crest"','class="bcrest"')}
+      <div class="bt">SUMMER FLAME<small>FRIENDLY FIRE</small></div></div>
+    <div class="rgt">
+      <div class="pagettl" id="pagettl">${ttl}</div>
+      <button class="iconbtn" id="gearBtn" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </div>`;
+}
+function tabbar(){
+  return `<div class="tabbar">
+    <button data-view="passport" class="${VIEW==="passport"?"on":""}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M9 3v18"/><circle cx="14.5" cy="9" r="1.6"/></svg>
+      Passport</button>
+    <button data-view="leaderboard" class="${VIEW==="leaderboard"?"on":""}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>
+      Leaderboard</button>
+  </div>`;
+}
+function wireTabs(){
+  document.querySelectorAll(".tabbar button").forEach(b=>{
+    b.onclick=()=>{ VIEW=b.dataset.view;
+      el("view-pass").classList.toggle("off",VIEW!=="passport");
+      el("view-lb").classList.toggle("off",VIEW!=="leaderboard");
+      document.querySelectorAll(".tabbar button").forEach(x=>x.classList.toggle("on",x.dataset.view===VIEW));
+      el("pagettl").textContent = VIEW==="leaderboard"?"Leaderboard":"Passport";
+      if(VIEW==="leaderboard") buildLeaderboard();
+    };
+  });
+}
+
+/* ---------- PASSPORT PAGES ---------- */
+function buildPages(){
+  const sc = ffScore(S.days);
+  const weeks = ffCampaignWeeks();
+  const pages = [ pageDanas(sc, weeks), pageGuide() ].concat(weeks.map(w=>pageWeek(w)));
+  el("pager").innerHTML = pages.join("");
+  // dots
+  el("dots").innerHTML = pages.map((_,i)=>`<span class="dot ${i===0?"on":""}"></span>`).join("");
+  const pager=el("pager"), dots=[...document.querySelectorAll("#dots .dot")];
+  pager.onscroll=()=>{ const i=Math.round(pager.scrollLeft/pager.clientWidth);
+    dots.forEach((d,k)=>d.classList.toggle("on",k===i)); };
+  // wire record button
+  const rb=el("recordBtn"); if(rb) rb.onclick=openSheet;
+}
+
+function todayStatus(){
+  const t=ffToday(); const rec=S.days[t];
+  return { active: ffInCampaign(t), rec: rec||null, today:t };
+}
+
+/* Stvarni tekući niz koji završava danas (ili jučer ako danas još nije
+   zabilježeno), unutar tjedna — NE najduži niz tjedna. */
+function currentStreak(days, weekStart, todayStr){
+  let d=ffParse(todayStr);
+  if(!(days[ffFmt(d)] && days[ffFmt(d)].visit)) d=ffAddDays(d,-1);
+  let run=0; const ws=ffParse(weekStart);
+  while(d>=ws && days[ffFmt(d)] && days[ffFmt(d)].visit){ run++; d=ffAddDays(d,-1); }
+  return run;
+}
+
+function pageDanas(sc, weeks){
+  const v = ffVenueById(S.venueId);
+  const ts = todayStatus();
+
+  // record button / status
+  let recBlock="";
+  if(!ts.active){
+    const before = ts.today < FF_CAMPAIGN.start;
+    recBlock = `<div class="date-chip">🔥 ${before?"Summer Flame starts July 1, 2026.":"Summer is over — your passport stays as a keepsake."}</div>`;
+  } else if(ts.rec){
+    recBlock = `
+      <div class="today-stamps">
+        <div class="mini-stamp got"><span class="sdot" style="background:var(--stamp-yellow)"></span> Show up · +1</div>
+        ${ts.rec.lanTeam?`<div class="mini-stamp got"><span class="sdot" style="background:var(--stamp-orange)"></span> Squad ${ts.rec.lanTeam} · +${ffLanPoints(ts.rec.lanTeam)}</div>`:""}
+      </div>
+      <button class="btn ghost record-btn" disabled>Today's visit already recorded ✓</button>`;
+  } else {
+    recBlock = `<button class="btn fire record-btn" id="recordBtn">🔥 Record today's visit</button>`;
+  }
+
+  // simple quests = the three stamps, plainly explained
+  const quests = `
+    <div class="eyebrow" style="margin-bottom:6px">Today's quests</div>
+    <div class="quests">
+      <div class="quest">
+        <div class="qi" style="color:var(--stamp-yellow)">${flameSVG()}</div>
+        <div style="flex:1">
+          <div class="qt">Yellow stamp — Show up</div>
+          <div class="qs">Just come in today. <b>+1 point.</b></div>
+        </div>
+      </div>
+      <div class="quest">
+        <div class="qi" style="color:var(--stamp-orange)">${flameSVG()}</div>
+        <div style="flex:1">
+          <div class="qt">Orange stamp — Play together</div>
+          <div class="qs">Every extra person who comes and plays with you = <b>+2 points.</b></div>
+        </div>
+      </div>
+      <div class="quest">
+        <div class="qi" style="color:var(--stamp-red)">${flameSVG()}</div>
+        <div style="flex:1">
+          <div class="qt">Red stamp — Attendance streak</div>
+          <div class="qs">3 days in a row = <b>+3</b>, 5 days in a row = <b>+10</b>, 7 days in a row = <b>+15</b>.</div>
+        </div>
+      </div>
+    </div>`;
+
+  const rewards = `
+    <div class="eyebrow" style="margin-bottom:8px">Rewards</div>
+    <div class="reward-note">🎮 <b>Every 10 points = 1 hour of free play</b> — paid out at the end of each week.</div>
+    <div class="reward-note" style="margin-top:10px">🏆 <b>On Aug 31</b> the summer leaderboard pays out:<br/>&nbsp;&nbsp;• Top 10 players — 1st place <b>10h</b> of play, 2nd <b>9h</b> … down to 10th <b>1h</b>.<br/>&nbsp;&nbsp;• Best Friendly Fire — <b>1 week of 50% off</b> play after Aug 31.</div>`;
+
+  return `<div class="page"><div class="card"><div class="edge"></div>
+      <div class="today-head">
+        <div class="who">
+          <div class="nm">${esc(S.name)}</div>
+          <div class="pno">${esc(S.passportNo)}</div>
+          <div class="vv">${v?ffFlag(v.country)+" "+esc(v.name)+" · "+esc(v.city):""}</div>
+        </div>
+        <div class="score"><div class="v">${sc.total}</div><div class="l">points</div></div>
+      </div>
+      <div class="date-chip">🗓️ Today · ${fmtDateLong(ts.today)}</div>
+      ${recBlock}
+    </div>
+    <div class="card">${quests}</div>
+    <div class="card">${rewards}</div>
+  </div>`;
+}
+
+function pageGuide(){
+  return `<div class="page">
+    <div class="card"><div class="edge"></div>
+      <div class="eyebrow">Guide</div>
+      <h3 style="font-family:var(--disp);margin:6px 0 4px;font-size:19px">How to collect stamps</h3>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 8px">Every visit is confirmed by a staff member with the daily code. No confirmation, no stamp.</p>
+      <div class="legend-row lg-y">
+        <div class="stamp"><div class="rot"></div>${flameSVG()}</div>
+        <div><div class="lt">Yellow stamp — Show up</div><div class="ld"><b>+1 point.</b> Just come in that day — alone or with friends.</div></div>
+      </div>
+      <div class="legend-row lg-o">
+        <div class="stamp"><div class="rot"></div>${flameSVG()}</div>
+        <div><div class="lt">Orange stamp — Play together</div><div class="ld"><b>+2 points</b> for every extra person who comes and plays with you.</div></div>
+      </div>
+      <div class="legend-row lg-r">
+        <div class="stamp"><div class="rot"></div>${flameSVG()}</div>
+        <div><div class="lt">Red stamp — Attendance streak</div><div class="ld"><b>3 days in a row = +3</b>, 5 days in a row = +10, 7 days in a row = +15.</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="eyebrow">Rewards</div>
+      <h3 style="font-family:var(--disp);margin:6px 0 8px;font-size:19px">Weekly play time</h3>
+      <div class="reward"><span>Every 10 points</span><span class="rv">1 hour of play</span></div>
+      <div style="font-size:12px;color:var(--muted);margin:6px 0 0">Paid out at the end of each week.</div>
+      <h3 style="font-family:var(--disp);margin:16px 0 8px;font-size:19px">End of summer — Aug 31 leaderboard</h3>
+      <div class="reward"><span>1st place</span><span class="rv">10 hours of play</span></div>
+      <div class="reward"><span>2nd place</span><span class="rv">9 hours of play</span></div>
+      <div class="reward"><span>3rd place</span><span class="rv">8 hours of play</span></div>
+      <div class="reward"><span>… down to 10th place</span><span class="rv">1 hour of play</span></div>
+      <div class="reward"><span>🏟️ Best Friendly Fire</span><span class="rv">1 week of 50% off</span></div>
+    </div>
+  </div>`;
+}
+
+function pageWeek(w){
+  const sc = ffScore(S.days);
+  const red = sc.perWeekRed[w.index]||0;
+  const wkPts = ffWeekPoints(S.days, w);
+  const rewardHours = ffWeeklyRewardHours(wkPts);
+  const run = ffMaxRun(S.days, w.start, w.end);
+  const today = ffToday();
+
+  // build 7 day cells (Mon..Sun) of the calendar week
+  let cells="";
+  let d=ffParse(w.mondayStart);
+  for(let i=0;i<7;i++){
+    const key=ffFmt(d);
+    const inCamp = ffInCampaign(key);
+    const rec = S.days[key];
+    const isToday = key===today;
+    let stamps="";
+    if(rec&&rec.visit){
+      stamps+='<b style="background:var(--stamp-yellow)"></b>';
+      if(rec.lanTeam) stamps+='<b style="background:var(--stamp-orange)"></b>';
+    }
+    cells += `<div class="day ${inCamp?"":"out"} ${isToday?"today":""}">
+      <div class="dow">${EN_DOW[i]}</div><div class="dn">${d.getDate()}</div>
+      <div class="st">${stamps}</div></div>`;
+    d=ffAddDays(d,1);
+  }
+
+  const rangeLabel = `${EN_MON[ffParse(w.start).getMonth()].slice(0,3)} ${ffParse(w.start).getDate()} – ${EN_MON[ffParse(w.end).getMonth()].slice(0,3)} ${ffParse(w.end).getDate()}`;
+  return `<div class="page"><div class="card"><div class="edge"></div>
+    <div class="week-head">
+      <div><div class="wn">Week ${w.index}</div><div class="wr">${rangeLabel}</div></div>
+      <div class="week-pts">${wkPts} pts</div>
+    </div>
+    <div class="days">${cells}</div>
+    <div class="week-red">
+      <span class="stamp lg-r" style="width:24px;height:24px;border-width:1.5px">${flameSVG()}</span>
+      ${run>=3?`${run>=7?"Full week":run+" days"} in a row → red stamp +${red}`:`Longest streak: ${run} — red stamp starts at 3 days in a row`}
+    </div>
+    ${rewardHours>=1?`<div class="week-reward">🎮 Week reward: ${rewardHours} ${rewardHours===1?"hour":"hours"} of free play (10 pts = 1h).</div>`:""}
+  </div></div>`;
+}
+
+/* =====================================================================
+   RECORD SHEET  (Dinova izmjena: radnik upisuje kod na igračevom mobitelu)
+   ===================================================================== */
+function recordSheet(){
+  return `<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet">
+    <div class="grip"></div>
+    <h3>Record today's visit</h3>
+    <p class="sh-sub">Enter today's arcade code.</p>
+    <input class="code-in" id="codeIn" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" />
+    <div class="errline" id="codeErr"></div>
+    <div class="worker-note">
+      <span class="wi">📱</span>
+      <div class="wt"><b>Hand your phone to a staff member</b> so they can type today's code. The code is not read out loud.</div>
+    </div>
+    <div class="lan-toggle">
+      <div><div class="lt2">I'm playing with a squad</div><div class="ls">Came with friends? Turn on for the orange stamp.</div></div>
+      <button class="switch" id="lanSw"><b></b></button>
+    </div>
+    <div class="team" id="teamWrap">
+      <div class="tl">Squad size (including you)</div>
+      <div class="team-grid" id="teamGrid"></div>
+      <div class="tp" id="teamPts"></div>
+    </div>
+    <button class="btn fire" id="confirmCode" style="margin-top:18px">Confirm code</button>
+    <button class="btn ghost" id="cancelCode" style="margin-top:8px">Cancel</button>
+  </div></div>`;
+}
+function successOverlay(){
+  let sparks=""; for(let i=0;i<14;i++){ const a=i/14*6.283, dx=Math.cos(a)*(90+Math.random()*40), dy=Math.sin(a)*(90+Math.random()*40);
+    sparks+=`<span class="spark" style="--dx:${dx}px;--dy:${dy}px;left:calc(50% - 3px);top:38%"></span>`; }
+  return `<div class="success-bg" id="successBg">
+    ${sparks}
+    <div class="big-stamp" id="bigStamp"><div class="rot"></div>${flameSVG()}</div>
+    <h2 id="successTtl">Stamp added!</h2>
+    <p id="successMsg"></p>
+    <div class="pts" id="successPts"></div>
+  </div>`;
+}
+/* Podigni sheet iznad tipkovnice (iOS): tipkovnica smanji visual viewport,
+   pa gornji dio ekrana ostane, a mi dnom sheeta stanemo na vrh tipkovnice —
+   tako gumb "Potvrdi kod" nikad ne završi ispod tipkovnice. */
+let vvHandler=null;
+function fitSheetKeyboard(){
+  const vv=window.visualViewport; if(!vv) return;
+  const kb=Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+  el("sheetBg").style.paddingBottom = kb ? kb+"px" : "";
+}
+function openSheet(){
+  const t=ffToday();
+  if(!ffInCampaign(t)){ toast("The campaign isn't active."); return; }
+  if(S.days[t]){ toast("Today's visit is already recorded."); return; }
+  REC={lan:false,team:null};
+  el("codeIn").value=""; el("codeErr").textContent="";
+  el("codeIn").classList.remove("err");
+  el("lanSw").classList.remove("on");
+  el("teamWrap").classList.remove("on");
+  el("teamPts").textContent="";
+  el("sheetBg").classList.add("on");
+  if(window.visualViewport){
+    vvHandler=fitSheetKeyboard;
+    window.visualViewport.addEventListener("resize",vvHandler);
+    window.visualViewport.addEventListener("scroll",vvHandler);
+  }
+  setTimeout(()=>{ el("codeIn").focus(); fitSheetKeyboard(); },320);
+}
+function closeSheet(){
+  el("sheetBg").classList.remove("on");
+  if(el("codeIn")) el("codeIn").blur();
+  if(window.visualViewport && vvHandler){
+    window.visualViewport.removeEventListener("resize",vvHandler);
+    window.visualViewport.removeEventListener("scroll",vvHandler);
+    vvHandler=null;
+  }
+  el("sheetBg").style.paddingBottom="";
+}
+
+function wireSheet(){
+  // team buttons 2..10
+  let grid=""; for(let n=2;n<=10;n++) grid+=`<button data-n="${n}">${n}</button>`;
+  el("teamGrid").innerHTML=grid;
+  el("teamGrid").querySelectorAll("button").forEach(b=>{
+    b.onclick=()=>{
+      REC.team=Number(b.dataset.n);
+      el("teamGrid").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));
+      el("teamPts").textContent = `Orange stamp: +${ffLanPoints(REC.team)} points`;
+    };
+  });
+  el("lanSw").onclick=()=>{
+    REC.lan=!REC.lan;
+    el("lanSw").classList.toggle("on",REC.lan);
+    el("teamWrap").classList.toggle("on",REC.lan);
+    if(!REC.lan){ REC.team=null; el("teamGrid").querySelectorAll("button").forEach(x=>x.classList.remove("on")); el("teamPts").textContent=""; }
+  };
+  el("codeIn").addEventListener("input",()=>{ el("codeErr").textContent=""; el("codeIn").classList.remove("err"); });
+  el("codeIn").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); confirmCode(); } });
+  el("cancelCode").onclick=closeSheet;
+  el("confirmCode").onclick=confirmCode;
+  el("sheetBg").onclick=(e)=>{ if(e.target===el("sheetBg")) closeSheet(); };
+}
+
+function confirmCode(){
+  const t=ffToday();
+  const code=el("codeIn").value.trim();
+  if(REC.lan && !REC.team){ el("codeErr").textContent="Pick your squad size first."; return; }
+  if(!ffCheckCode(S.venueId, code, t)){
+    el("codeIn").classList.add("err");
+    el("codeErr").textContent="Wrong code. Check with a staff member.";
+    return;
+  }
+  // valid → write stamp(s). No save button: it persists immediately and stays.
+  const rec = { visit:true, lanTeam: (REC.lan && REC.team)?REC.team:null, code };
+  S.days[t] = rec;
+  if(!save()){
+    delete S.days[t];   // saving failed — don't fake success
+    el("codeErr").textContent = "Couldn't save. Turn off private/incognito mode and try again.";
+    return;
+  }
+  closeSheet();
+  showSuccess(rec);
+  // pri sljedećem otvaranju / re-renderu pečat je već tu
+  buildPages();
+  buildLeaderboard();
+}
+
+function showSuccess(rec){
+  const bg=el("successBg"), stamp=el("bigStamp");
+  let pts=1, msg="Yellow stamp — show up +1.";
+  stamp.className="big-stamp"; stamp.style.color="var(--stamp-yellow)";
+  if(rec.lanTeam){
+    const lp=ffLanPoints(rec.lanTeam); pts+=lp;
+    msg=`Yellow +1 and orange squad +${lp} (squad of ${rec.lanTeam}).`;
+    stamp.style.color="var(--stamp-orange)";
+  }
+  el("successTtl").textContent = rec.lanTeam?"Two stamps!":"Stamp added!";
+  el("successMsg").textContent = msg;
+  el("successPts").textContent = `+${pts} ${pts===1?"point":"points"} · total ${ffScore(S.days).total}`;
+  // restart spark animation
+  bg.classList.remove("on"); void bg.offsetWidth; bg.classList.add("on");
+  bg.onclick=()=>bg.classList.remove("on");
+  setTimeout(()=>bg.classList.remove("on"),2600);
+}
+
+/* =====================================================================
+   LEADERBOARD
+   ===================================================================== */
+/* Seed imena za demo ljestvicu. U produkciji ovo hrani backend feed
+   (bodovi svih igrača po poslovnici). Lokalni igrač se UVIJEK ubaci sa
+   svojim živim rezultatom u ljestvicu svoje poslovnice. */
+const LB_NAMES = ["Blitzy","Vortex","NoScope","Krmelj","Zmaj","Pixel","Havoc","Luna","Riko","Munja","Sablja","Frost","Kaktus","Nero","Vuk","Astra","Ghost","Cobra","Rocco","Mika","Nyx","Puma","Titan","Echo","Zeta","Bane","Orka","Feniks","Vipera","Dado","Storm","Rex","Neo","Klik","Zara"];
+function mulberry32(a){ return function(){ a|=0;a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function hashSeed(s){ let h=0x811c9dc5; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h>>>0; }
+function seededBoard(venueId){
+  const rnd=mulberry32(hashSeed("board|"+venueId));
+  const pool=[...LB_NAMES];
+  // deterministic shuffle
+  for(let i=pool.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+  const n=10+Math.floor(rnd()*4);
+  const players=[];
+  for(let i=0;i<n;i++){ players.push({ name:pool[i], score: Math.max(3, Math.round(8+rnd()*rnd()*115)), seed:true }); }
+  return players;
+}
+function seededVenueTotals(){
+  return ffAllVenues().map(v=>{
+    const rnd=mulberry32(hashSeed("venue|"+v.id));
+    const board=seededBoard(v.id);
+    let total=board.reduce((a,b)=>a+b.score,0);
+    if(v.id===S.venueId) total+=ffScore(S.days).total;
+    return { ...v, total };
+  }).sort((a,b)=>b.total-a.total);
+}
+
+function buildLeaderboard(){
+  const view=el("view-lb"); if(!view) return;
+  const venOpts = FF_COUNTRIES.map(c=>`<optgroup label="${c.flag} ${c.label} · ${c.name}">${
+    c.venues.map(v=>`<option value="${v.id}" ${v.id===LB_VENUE?"selected":""}>${esc(v.name)}</option>`).join("")
+  }</optgroup>`).join("");
+
+  view.innerHTML = `<div class="lb">
+    <div class="seg">
+      <button data-m="players" class="${LB_MODE==="players"?"on":""}">Players</button>
+      <button data-m="venues" class="${LB_MODE==="venues"?"on":""}">Arcades</button>
+    </div>
+    <div id="lbBody"></div>
+  </div>`;
+  view.querySelectorAll(".seg button").forEach(b=> b.onclick=()=>{ LB_MODE=b.dataset.m; buildLeaderboard(); });
+
+  const body=el("lbBody");
+  if(LB_MODE==="venues"){
+    const rows=seededVenueTotals();
+    body.innerHTML = `<div class="lb-title">🏆 All arcades this summer · best one wins 1 week of 50% off</div>` +
+      rows.map((v,i)=>rankRow(i+1, `${ffFlag(v.country)} ${esc(v.name)}`, esc(v.city), v.total, v.id===S.venueId, i===0?"🏟️ 50% off":"")).join("") +
+      lbNote();
+  } else {
+    let list=seededBoard(LB_VENUE);
+    // inject the local player into THEIR OWN arcade board with their live score
+    if(LB_VENUE===S.venueId){ list=list.concat([{ name:S.name, score:ffScore(S.days).total, me:true }]); }
+    list.sort((a,b)=> (b.score-a.score) || ((b.me?1:0)-(a.me?1:0)));
+    const ven=ffVenueById(LB_VENUE);
+    body.innerHTML =
+      `<select class="vsel" id="vsel">${venOpts}</select>
+       <div class="lb-title">${ven?ffFlag(ven.country)+" "+esc(ven.name):""} · top players · Aug 31 prizes shown</div>` +
+      list.map((p,i)=>{ const h=ffPlayerPrizeHours(i+1); return rankRow(i+1, esc(p.name)+(p.me?" (you)":""), "", p.score, !!p.me, h?`🏆 ${h}h`:""); }).join("") +
+      lbNote();
+    el("vsel").onchange=(e)=>{ LB_VENUE=e.target.value; buildLeaderboard(); };
+  }
+}
+function rankRow(pos,name,sub,score,me,prize){
+  const medal = pos===1?"🥇":pos===2?"🥈":pos===3?"🥉":"";
+  const topcls = pos<=3?`top${pos}`:"";
+  return `<div class="rank ${me?"me":""} ${topcls}">
+    <div class="pos">${pos}</div>
+    <div class="rn">${name}${sub?`<small>${sub}</small>`:""}</div>
+    ${prize?`<span class="prize">${prize}</span>`:""}
+    ${medal?`<span class="medal">${medal}</span>`:""}
+    <div class="rp">${score}</div>
+  </div>`;
+}
+function lbNote(){
+  return `<div class="lb-note">Demo standings (sample). In production these come from the Friendly Fire system — your own score is always real and live.</div>`;
+}
+
+/* ---------- toast ---------- */
+let toastT=null;
+function toast(msg){ const t=el("toast"); if(!t) return; t.textContent=msg; t.classList.add("on");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("on"),2200); }
+
+/* ---------- boot ---------- */
+render();
+// osvježi ako se app vrati u prvi plan (novi dan / novi pečat)
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden && S && S.name && S.venueId){ buildPages(); } });
+</script>
+</body>
+</html>
