@@ -227,6 +227,10 @@ button{font-family:var(--font); cursor:pointer}
 .rank .prize{font-family:var(--disp);font-size:10.5px;font-weight:700;color:var(--gold2);background:rgba(233,196,106,.12);border:1px solid rgba(233,196,106,.3);padding:3px 7px;border-radius:999px;margin-right:8px;white-space:nowrap}
 .rank .medal{font-size:16px}
 .lb-note{margin-top:10px;font-size:11px;color:var(--muted2);line-height:1.5;text-align:center;padding:0 8px}
+.lb-empty{text-align:center;padding:38px 18px 24px;color:var(--muted)}
+.lb-empty-i{font-size:44px;opacity:.45;margin-bottom:10px}
+.lb-empty-t{font-family:var(--disp);font-weight:700;font-size:17px;color:var(--text)}
+.lb-empty-s{font-size:13px;margin:8px auto 0;line-height:1.55;max-width:290px}
 
 /* ---------- BOTTOM NAV ---------- */
 .tabbar{display:flex;border-top:1px solid var(--line);background:var(--bg2);
@@ -936,31 +940,10 @@ function showSuccess(rec){
 /* =====================================================================
    LEADERBOARD
    ===================================================================== */
-/* Seed imena za demo ljestvicu. U produkciji ovo hrani backend feed
-   (bodovi svih igrača po poslovnici). Lokalni igrač se UVIJEK ubaci sa
-   svojim živim rezultatom u ljestvicu svoje poslovnice. */
-const LB_NAMES = ["Blitzy","Vortex","NoScope","Krmelj","Zmaj","Pixel","Havoc","Luna","Riko","Munja","Sablja","Frost","Kaktus","Nero","Vuk","Astra","Ghost","Cobra","Rocco","Mika","Nyx","Puma","Titan","Echo","Zeta","Bane","Orka","Feniks","Vipera","Dado","Storm","Rex","Neo","Klik","Zara"];
-function mulberry32(a){ return function(){ a|=0;a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
-function hashSeed(s){ let h=0x811c9dc5; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; } return h>>>0; }
-function seededBoard(venueId){
-  const rnd=mulberry32(hashSeed("board|"+venueId));
-  const pool=[...LB_NAMES];
-  // deterministic shuffle
-  for(let i=pool.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
-  const n=10+Math.floor(rnd()*4);
-  const players=[];
-  for(let i=0;i<n;i++){ players.push({ name:pool[i], score: Math.max(3, Math.round(8+rnd()*rnd()*115)), seed:true }); }
-  return players;
-}
-function seededVenueTotals(){
-  return ffAllVenues().map(v=>{
-    const rnd=mulberry32(hashSeed("venue|"+v.id));
-    const board=seededBoard(v.id);
-    let total=board.reduce((a,b)=>a+b.score,0);
-    if(v.id===S.venueId) total+=ffScore(S.days).total;
-    return { ...v, total };
-  }).sort((a,b)=>b.total-a.total);
-}
+/* Ljestvica prikazuje ISKLJUČIVO stvarne rezultate. Bez servera app zna samo
+   za igrača na OVOM uređaju, pa je prazna dok se ne skupi prvi bod. Kad se
+   uključi živi zajednički feed (backend), ovdje se ubacuju i ostali igrači. */
+function myLiveScore(){ return S ? ffScore(S.days).total : 0; }
 
 function buildLeaderboard(){
   const view=el("view-lb"); if(!view) return;
@@ -971,29 +954,43 @@ function buildLeaderboard(){
   view.innerHTML = `<div class="lb">
     <div class="seg">
       <button data-m="players" class="${LB_MODE==="players"?"on":""}">Players</button>
-      <button data-m="venues" class="${LB_MODE==="venues"?"on":""}">Arcades</button>
+      <button data-m="venues" class="${LB_MODE==="venues"?"on":""}">FF Arenas</button>
     </div>
     <div id="lbBody"></div>
   </div>`;
   view.querySelectorAll(".seg button").forEach(b=> b.onclick=()=>{ LB_MODE=b.dataset.m; buildLeaderboard(); });
 
   const body=el("lbBody");
+  const myScore = myLiveScore();
+
   if(LB_MODE==="venues"){
-    const rows=seededVenueTotals();
-    body.innerHTML = `<div class="lb-title">🏆 All arcades this summer · best one wins 1 week of 50% off</div>` +
+    // Samo FF Arene sa stvarnim bodovima. Bez zajedničkog feeda to je jedino
+    // tvoja arena (kad imaš bodove). Ostale se pojave kad krene živi sync.
+    const rows = (myScore>0 && S.venueId) ? [{ ...ffVenueById(S.venueId), total: myScore }] : [];
+    if(!rows.length){
+      body.innerHTML = lbEmpty("No FF Arena has points yet",
+        "As players start collecting stamps, arenas climb here. Best FF Arena on Aug 31 wins 1 week of 50% off.");
+      return;
+    }
+    body.innerHTML = `<div class="lb-title">🏆 FF Arenas this summer · best one wins 1 week of 50% off</div>` +
       rows.map((v,i)=>rankRow(i+1, `${ffFlag(v.country)} ${esc(v.name)}`, esc(v.city), v.total, v.id===S.venueId, i===0?"🏟️ 50% off":"")).join("") +
       lbNote();
   } else {
-    let list=seededBoard(LB_VENUE);
-    // inject the local player into THEIR OWN arcade board with their live score
-    if(LB_VENUE===S.venueId){ list=list.concat([{ name:S.name, score:ffScore(S.days).total, me:true }]); }
-    list.sort((a,b)=> (b.score-a.score) || ((b.me?1:0)-(a.me?1:0)));
+    // Igrači u odabranoj areni. Lokalno samo TI (u svojoj areni, kad imaš bodove).
+    const list = (LB_VENUE===S.venueId && myScore>0) ? [{ name:S.name, score:myScore, me:true }] : [];
     const ven=ffVenueById(LB_VENUE);
-    body.innerHTML =
-      `<select class="vsel" id="vsel">${venOpts}</select>
-       <div class="lb-title">${ven?ffFlag(ven.country)+" "+esc(ven.name):""} · top players · Aug 31 prizes shown</div>` +
-      list.map((p,i)=>{ const h=ffPlayerPrizeHours(i+1); return rankRow(i+1, esc(p.name)+(p.me?" (you)":""), "", p.score, !!p.me, h?`🏆 ${h}h`:""); }).join("") +
-      lbNote();
+    const header = `<select class="vsel" id="vsel">${venOpts}</select>
+       <div class="lb-title">${ven?ffFlag(ven.country)+" "+esc(ven.name):""} · top players · Aug 31 prizes shown</div>`;
+    if(!list.length){
+      body.innerHTML = header + lbEmpty(
+        LB_VENUE===S.venueId ? "No points here yet — be the first!" : "No players here yet",
+        LB_VENUE===S.venueId ? "Record today's visit on the Passport tab to appear on the board."
+                             : "Players show up here once they start collecting stamps.");
+    } else {
+      body.innerHTML = header +
+        list.map((p,i)=>{ const h=ffPlayerPrizeHours(i+1); return rankRow(i+1, esc(p.name)+(p.me?" (you)":""), "", p.score, !!p.me, h?`🏆 ${h}h`:""); }).join("") +
+        lbNote();
+    }
     el("vsel").onchange=(e)=>{ LB_VENUE=e.target.value; buildLeaderboard(); };
   }
 }
@@ -1008,8 +1005,15 @@ function rankRow(pos,name,sub,score,me,prize){
     <div class="rp">${score}</div>
   </div>`;
 }
+function lbEmpty(title, sub){
+  return `<div class="lb-empty">
+    <div class="lb-empty-i">🏆</div>
+    <div class="lb-empty-t">${esc(title)}</div>
+    <div class="lb-empty-s">${esc(sub)}</div>
+  </div>`;
+}
 function lbNote(){
-  return `<div class="lb-note">Demo standings (sample). In production these come from the Friendly Fire system — your own score is always real and live.</div>`;
+  return `<div class="lb-note">Only your own passport is stored on this phone, so for now you see just your live score. A shared leaderboard across all players turns on when live sync is enabled.</div>`;
 }
 
 /* ---------- toast ---------- */
