@@ -532,6 +532,18 @@ async function pushScore(){
     });
   }catch(e){ /* offline/greška — ljestvica se svejedno napuni pri idućem otvaranju */ }
 }
+/* Reset putovnice = ukloni svoj rezultat s leaderboarda. Anon ne može DELETE (RLS),
+   pa postavljamo score 0 → nestaje i iz Players i iz zbroja FF Arene. */
+async function sbResetMe(pid, vid){
+  if(!SB_ON || !pid) return;
+  try{
+    await fetch(`${SB_URL}/rest/v1/scores`, {
+      method:"POST",
+      headers:{ ...SB_HEADERS, "Prefer":"resolution=merge-duplicates" },
+      body: JSON.stringify({ player_id:pid, nickname:"(reset)", venue_id:vid||"none", score:0, updated_at:new Date().toISOString() })
+    });
+  }catch(e){ /* offline — rezultat će ostati dok se ponovno ne otvori online */ }
+}
 async function sbPlayers(venueId){
   const url = `${SB_URL}/rest/v1/scores?venue_id=eq.${encodeURIComponent(venueId)}&select=player_id,nickname,score&order=score.desc,updated_at.asc&limit=100`;
   const r = await fetch(url, { headers: SB_HEADERS });
@@ -681,8 +693,10 @@ function wireSettings(){
   el("setClose").onclick=()=>el("settingsBg").classList.remove("on");
   el("settingsBg").onclick=(e)=>{ if(e.target===el("settingsBg")) el("settingsBg").classList.remove("on"); };
   el("setChangeVenue").onclick=()=>{ el("settingsBg").classList.remove("on"); renderPicker(S.venueId); };
-  el("setReset").onclick=()=>{
+  el("setReset").onclick=async ()=>{
     if(confirm("Reset passport? All your stamps and points will be deleted. This can't be undone.")){
+      const pid=S&&S.playerId, vid=S&&S.venueId;
+      await sbResetMe(pid, vid);      // makni i s leaderboarda prije lokalnog brisanja
       localStorage.removeItem(STORE_KEY); S=null; VIEW="passport"; render();
     }
   };
@@ -859,51 +873,97 @@ function pageHome(sc, weeks){
    Svaki tjedan = mapa s drukčijom temom. 7 stopova (dani) povezanih isprekidanom
    rutom; zadnji dan = škrinja s blagom (tjedna nagrada). */
 const WEEK_THEMES = [
-  { name:"Treasure Isles", sky:["#123047","#0b1a2b"], trail:"#ffd76a", node:"#e6c67a", node2:"#b8862c", accent:"#37c4d6", ink:"#0b1a2b", motif:"waves"   },
-  { name:"Ember Ridge",    sky:["#2c1012","#160a10"], trail:"#ffd15a", node:"#ff9a4d", node2:"#b3311a", accent:"#ff5a2c", ink:"#2a0d0d", motif:"peaks"   },
-  { name:"Lost Jungle",    sky:["#0e2a1a","#08160f"], trail:"#e6f79a", node:"#7fd28c", node2:"#2f8b4d", accent:"#37d98a", ink:"#0b1c12", motif:"leaves"  },
-  { name:"Golden Dunes",   sky:["#2b2009","#181005"], trail:"#ffe6a0", node:"#f0c879", node2:"#c58a2c", accent:"#f2a23c", ink:"#241a08", motif:"dunes"   },
-  { name:"Frozen North",   sky:["#0d2436","#0a1622"], trail:"#bfe9ff", node:"#bfe1f2", node2:"#4f8fb8", accent:"#7fdfff", ink:"#0c1b28", motif:"waves"   },
-  { name:"Star Voyage",    sky:["#1a1030","#0e0a1c"], trail:"#e5c7ff", node:"#b48cf0", node2:"#5a34a8", accent:"#c08bff", ink:"#140c26", motif:"stars"   },
-  { name:"Summit Trail",   sky:["#182430","#0e151d"], trail:"#dfe9f5", node:"#9fb4cf", node2:"#4a5f80", accent:"#8fb0e0", ink:"#111a24", motif:"peaks"   },
-  { name:"Neon Nights",    sky:["#241033","#120a1e"], trail:"#7ff0ff", node:"#ff6ad5", node2:"#7a2bb0", accent:"#7ff0ff", ink:"#160a24", motif:"skyline" },
+  { name:"Treasure Isles", key:"pirate",  amb:"waves",  sky:["#123047","#0b1a2b"], trail:"#ffd76a", node:"#e6c67a", node2:"#b8862c", accent:"#37c4d6", ink:"#0b1a2b" },
+  { name:"Ember Ridge",    key:"volcano", amb:"none",   sky:["#2c1012","#160a10"], trail:"#ffd15a", node:"#ff9a4d", node2:"#b3311a", accent:"#ff7a1a", ink:"#2a0d0d" },
+  { name:"Lost Jungle",    key:"jungle",  amb:"leaves", sky:["#0e2a1a","#08160f"], trail:"#e6f79a", node:"#7fd28c", node2:"#2f8b4d", accent:"#37d98a", ink:"#0b1c12" },
+  { name:"Golden Dunes",   key:"desert",  amb:"dunes",  sky:["#2b2009","#181005"], trail:"#ffe6a0", node:"#f0c879", node2:"#c58a2c", accent:"#f2a23c", ink:"#241a08" },
+  { name:"Frozen North",   key:"arctic",  amb:"snow",   sky:["#0d2436","#0a1622"], trail:"#bfe9ff", node:"#bfe1f2", node2:"#4f8fb8", accent:"#7fdfff", ink:"#0c1b28" },
+  { name:"Star Voyage",    key:"space",   amb:"stars",  sky:["#1a1030","#0e0a1c"], trail:"#e5c7ff", node:"#b48cf0", node2:"#5a34a8", accent:"#c08bff", ink:"#140c26" },
+  { name:"Summit Trail",   key:"summit",  amb:"none",   sky:["#182430","#0e151d"], trail:"#dfe9f5", node:"#9fb4cf", node2:"#4a5f80", accent:"#8fb0e0", ink:"#111a24" },
+  { name:"Neon Nights",    key:"neon",    amb:"stars",  sky:["#241033","#120a1e"], trail:"#7ff0ff", node:"#ff6ad5", node2:"#7a2bb0", accent:"#7ff0ff", ink:"#160a24" },
 ];
 
-function motifSVG(t, W, H){
-  const a=t.accent, n2=t.node2;
-  if(t.motif==="waves"){
-    let s=""; for(let i=0;i<Math.ceil(H/70);i++){ const y=70+i*70;
-      s+=`<path d="M0 ${y} q 38 -13 75 0 t 75 0 t 75 0 t 75 0" fill="none" stroke="${a}" stroke-width="2" opacity="0.15"/>`; }
-    return s;
-  }
-  if(t.motif==="peaks"){
-    return `<path d="M0 ${H} L60 ${H-160} L120 ${H-70} L185 ${H-210} L245 ${H-90} L${W} ${H-160} L${W} ${H} Z" fill="${a}" opacity="0.13"/>
-      <path d="M0 ${H} L45 ${H-95} L115 ${H-30} L175 ${H-130} L235 ${H-45} L${W} ${H-95} L${W} ${H} Z" fill="${a}" opacity="0.09"/>`;
-  }
-  if(t.motif==="leaves"){
-    let s=""; const pts=[[32,110],[262,170],[46,330],[256,400],[38,540],[258,590],[150,700],[40,760]];
-    for(const [x,y] of pts){ if(y>H-20) continue; s+=`<g transform="translate(${x} ${y}) rotate(${(x+y)%90})" opacity="0.16"><path d="M0 0 Q15 -11 30 0 Q15 11 0 0 Z" fill="${a}"/><line x1="0" y1="0" x2="30" y2="0" stroke="${n2}" stroke-width="1"/></g>`; }
-    return s;
-  }
-  if(t.motif==="dunes"){
-    let s=""; for(let i=0;i<Math.ceil(H/120);i++){ const y=130+i*120;
-      s+=`<path d="M0 ${y} q 90 -42 155 0 q 65 40 160 0 L${W} ${H} L0 ${H} Z" fill="${a}" opacity="${0.05+(i%2)*0.03}"/>`; }
-    return s;
-  }
-  if(t.motif==="stars"){
-    let s=`<circle cx="238" cy="86" r="24" fill="${a}" opacity="0.16"/><circle cx="248" cy="79" r="19" fill="${t.sky[0]}"/>`;
-    for(let i=0;i<46;i++){ const x=(i*89%288)+6, y=(i*151%(H-30))+16, r=(i%4===0?1.7:1);
-      s+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" opacity="0.55"/>`; }
-    return s;
-  }
-  if(t.motif==="skyline"){
-    let s="", x=0, i=0;
-    while(x<W){ const bw=20+(i*13%22), bh=70+(i*47%170);
-      s+=`<rect x="${x}" y="${H-bh}" width="${bw-4}" height="${bh}" fill="${a}" opacity="0.12"/>`;
-      for(let wy=H-bh+8; wy<H-8; wy+=16){ s+=`<rect x="${x+3}" y="${wy}" width="3" height="4" fill="${t.trail}" opacity="0.18"/>`; }
-      x+=bw; i++; }
-    return s;
-  }
+/* Ambijentna pozadina (suptilno). */
+function ambient(kind,W,H,t){
+  if(kind==="waves"){ let s=""; for(let i=0;i<Math.ceil(H/72);i++){ const y=72+i*72;
+    s+=`<path d="M0 ${y} q 38 -12 75 0 t 75 0 t 75 0 t 75 0" fill="none" stroke="${t.accent}" stroke-width="2" opacity="0.13"/>`; } return s; }
+  if(kind==="dunes"){ let s=""; for(let i=0;i<Math.ceil(H/120);i++){ const y=150+i*120;
+    s+=`<path d="M0 ${y} q 90 -40 155 0 q 65 38 160 0 L${W} ${H} L0 ${H} Z" fill="${t.accent}" opacity="0.05"/>`; } return s; }
+  if(kind==="stars"){ let s=""; for(let i=0;i<44;i++){ const x=(i*89%288)+6, y=(i*151%(H-30))+16, r=(i%4===0?1.7:1);
+    s+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" opacity="0.5"/>`; } return s; }
+  if(kind==="snow"){ let s=""; for(let i=0;i<40;i++){ const x=(i*83%292)+4, y=(i*137%(H-20))+10;
+    s+=`<circle cx="${x}" cy="${y}" r="1.5" fill="#fff" opacity="0.5"/>`; } return s; }
+  if(kind==="leaves"){ let s=""; const pts=[[26,150],[274,235],[30,430],[276,520],[150,690]];
+    for(const [x,y] of pts){ if(y>H-30) continue; s+=`<g transform="translate(${x} ${y}) rotate(${(x+y)%90})" opacity="0.13"><path d="M0 0 Q15 -11 30 0 Q15 11 0 0 Z" fill="${t.accent}"/></g>`; } return s; }
+  return "";
+}
+/* Prepoznatljivi rekviziti po temi (vektorski). */
+function palm(x,y,s,leaf,trunk){ return `<g transform="translate(${x} ${y}) scale(${s})">
+  <path d="M0 0 C-2 -14 -1 -25 4 -33" fill="none" stroke="${trunk}" stroke-width="3.5" stroke-linecap="round"/>
+  <g stroke="${leaf}" stroke-width="3" fill="none" stroke-linecap="round">
+    <path d="M4 -33 q -15 -2 -23 6"/><path d="M4 -33 q 15 -3 23 4"/>
+    <path d="M4 -33 q -11 -12 -21 -15"/><path d="M4 -33 q 13 -12 23 -13"/><path d="M4 -33 q 1 -15 -1 -21"/>
+  </g><circle cx="4" cy="-33" r="2.5" fill="${trunk}"/></g>`; }
+function ship(x,y,s,hull,sail,accent){ return `<g transform="translate(${x} ${y}) scale(${s})">
+  <path d="M-20 0 L20 0 L14 11 L-14 11 Z" fill="${hull}"/>
+  <rect x="-1" y="-28" width="2.4" height="28" fill="${accent}"/>
+  <path d="M1.4 -26 L17 -6 L1.4 -6 Z" fill="${sail}"/><path d="M-1 -22 L-15 -8 L-1 -8 Z" fill="${sail}" opacity="0.9"/>
+  <path d="M1.4 -30 L11 -27 L1.4 -24 Z" fill="${accent}"/></g>`; }
+function skull(x,y,s,c){ return `<g transform="translate(${x} ${y}) scale(${s})" opacity="0.55">
+  <g stroke="${c}" stroke-width="2.6" stroke-linecap="round"><line x1="-12" y1="9" x2="12" y2="-9"/><line x1="-12" y1="-9" x2="12" y2="9"/></g>
+  <circle cx="0" cy="0" r="7.5" fill="${c}"/><rect x="-5" y="5.5" width="10" height="5" rx="2" fill="${c}"/>
+  <circle cx="-2.6" cy="-0.5" r="1.7" fill="#0a0d16"/><circle cx="2.6" cy="-0.5" r="1.7" fill="#0a0d16"/></g>`; }
+function volcano(x,y,s,rock,lava,glow){ return `<g transform="translate(${x} ${y}) scale(${s})">
+  <path d="M-34 0 L-11 -34 L11 -34 L34 0 Z" fill="${rock}"/>
+  <path d="M-11 -34 L11 -34 L7 -29 L-7 -29 Z" fill="${lava}"/>
+  <path d="M-6 -29 q -2 12 -6 20 M2 -31 q 4 15 2 25 M6 -29 q 3 11 9 19" stroke="${lava}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <circle cx="-2" cy="-41" r="3" fill="${glow}" opacity="0.7"/><circle cx="6" cy="-47" r="2" fill="${glow}" opacity="0.55"/></g>`; }
+function embers(W,H,c){ let s=""; for(let i=0;i<10;i++){ const x=(i*67%W), y=(i*103%(H-40))+20; s+=`<circle cx="${x}" cy="${y}" r="${i%3?1:1.8}" fill="${c}" opacity="0.4"/>`; } return s; }
+function temple(x,y,s,c1,c2){ return `<g transform="translate(${x} ${y}) scale(${s})">
+  <path d="M-30 0 L-22 -12 L22 -12 L30 0 Z" fill="${c1}"/><path d="M-22 -12 L-15 -24 L15 -24 L22 -12 Z" fill="${c2}"/>
+  <path d="M-15 -24 L-8 -36 L8 -36 L15 -24 Z" fill="${c1}"/><rect x="-4" y="-12" width="8" height="12" fill="#0a0d16" opacity="0.5"/></g>`; }
+function bigLeaf(x,y,s,c){ return `<g transform="translate(${x} ${y}) scale(${s}) rotate(${(x+y)%60-30})" opacity="0.5">
+  <path d="M0 0 Q22 -14 44 0 Q22 14 0 0 Z" fill="${c}"/><line x1="2" y1="0" x2="42" y2="0" stroke="#0a0d16" stroke-width="1.2" opacity="0.4"/></g>`; }
+function sun(x,y,s,c){ let r=""; for(let i=0;i<8;i++){ const a=i*Math.PI/4; r+=`<line x1="${(Math.cos(a)*15).toFixed(1)}" y1="${(Math.sin(a)*15).toFixed(1)}" x2="${(Math.cos(a)*23).toFixed(1)}" y2="${(Math.sin(a)*23).toFixed(1)}" stroke="${c}" stroke-width="2.6" stroke-linecap="round"/>`; }
+  return `<g transform="translate(${x} ${y}) scale(${s})" opacity="0.6"><circle r="11" fill="${c}"/>${r}</g>`; }
+function pyramid(x,y,s,c1,c2){ return `<g transform="translate(${x} ${y}) scale(${s})"><path d="M0 -30 L28 0 L-28 0 Z" fill="${c1}"/><path d="M0 -30 L28 0 L2 0 Z" fill="${c2}"/><path d="M0 -30 L6 -18 L-6 -18 Z" fill="#fff" opacity="0.25"/></g>`; }
+function cactus(x,y,s,c){ return `<g transform="translate(${x} ${y}) scale(${s})" fill="${c}">
+  <rect x="-4" y="-32" width="8" height="32" rx="4"/>
+  <path d="M-4 -20 h-8 a3 3 0 0 0 -3 3 v6 a3 3 0 0 0 6 0 v-3 h5 z"/><path d="M4 -24 h7 a3 3 0 0 1 3 3 v8 a3 3 0 0 1 -6 0 v-5 h-4 z"/></g>`; }
+function berg(x,y,s,c1,c2){ return `<g transform="translate(${x} ${y}) scale(${s})"><path d="M-27 0 L-9 -27 L9 -20 L27 0 Z" fill="${c1}"/><path d="M-9 -27 L9 -20 L3 0 L-9 0 Z" fill="${c2}" opacity="0.8"/></g>`; }
+function aurora(W,H,c){ return `<path d="M0 40 Q80 12 160 40 T320 40" fill="none" stroke="${c}" stroke-width="10" opacity="0.10"/><path d="M0 66 Q90 40 180 66 T340 66" fill="none" stroke="${c}" stroke-width="6" opacity="0.08"/>`; }
+function planet(x,y,s,c1,ring){ return `<g transform="translate(${x} ${y}) scale(${s})"><ellipse cx="0" cy="0" rx="26" ry="7" fill="none" stroke="${ring}" stroke-width="2.4" transform="rotate(-18)" opacity="0.8"/><circle r="13" fill="${c1}"/><circle cx="-4" cy="-4" r="3" fill="#fff" opacity="0.25"/></g>`; }
+function rocket(x,y,s,body,fin,flame){ return `<g transform="translate(${x} ${y}) scale(${s}) rotate(20)">
+  <path d="M0 -30 Q10 -18 10 2 L-10 2 Q-10 -18 0 -30 Z" fill="${body}"/><circle cx="0" cy="-12" r="4" fill="#0a0d16"/>
+  <path d="M-10 2 L-18 12 L-8 8 Z" fill="${fin}"/><path d="M10 2 L18 12 L8 8 Z" fill="${fin}"/><path d="M-6 2 Q0 18 6 2 Z" fill="${flame}"/></g>`; }
+function peak(x,y,s,rock,snow){ return `<g transform="translate(${x} ${y}) scale(${s})"><path d="M-30 0 L0 -46 L30 0 Z" fill="${rock}"/><path d="M-11 -17 L0 -46 L11 -17 L5 -13 L-1 -19 L-6 -13 Z" fill="${snow}"/></g>`; }
+function pine(x,y,s,c){ return `<g transform="translate(${x} ${y}) scale(${s})"><rect x="-2" y="-6" width="4" height="8" fill="#5e3c18"/><path d="M0 -34 L13 -8 L-13 -8 Z" fill="${c}"/><path d="M0 -26 L11 -3 L-11 -3 Z" fill="${c}"/><path d="M0 -34 L6 -22 L-6 -22 Z" fill="#fff" opacity="0.45"/></g>`; }
+function cloud(x,y,s,c){ return `<g transform="translate(${x} ${y}) scale(${s})" fill="${c}" opacity="0.4"><circle cx="0" cy="0" r="9"/><circle cx="12" cy="2" r="7"/><circle cx="-11" cy="2" r="7"/><rect x="-11" y="-1" width="24" height="9" rx="4"/></g>`; }
+function skyline(W,H,a,g){ let s="", x=0, i=0; while(x<W){ const bw=20+(i*13%22), bh=70+(i*47%170);
+  s+=`<rect x="${x}" y="${H-bh}" width="${bw-4}" height="${bh}" fill="${a}" opacity="0.14"/>`;
+  for(let wy=H-bh+8; wy<H-8; wy+=15){ s+=`<rect x="${x+3}" y="${wy}" width="3" height="4" fill="${g}" opacity="0.22"/>`; } x+=bw; i++; } return s; }
+function moon(x,y,s,c){ return `<g transform="translate(${x} ${y}) scale(${s})"><circle r="13" fill="${c}" opacity="0.9"/><circle cx="6" cy="-3" r="11" fill="#120a1e"/></g>`; }
+
+/* Kompletna scenografija po temi — složi ambijent + prepoznatljive rekvizite. */
+function scenerySVG(t,W,H){
+  const k=t.key, N=t.node, N2=t.node2, G=t.trail, A=t.accent, R=(f)=>Math.round(H*f);
+  if(k==="pirate") return ambient("waves",W,H,t)
+    + `<ellipse cx="44" cy="${H-24}" rx="48" ry="13" fill="${N2}" opacity="0.55"/>`
+    + palm(30,H-28,1.2,N,"#7a4a1e") + palm(60,H-22,0.92,N,"#7a4a1e") + palm(272,H-70,0.9,N,"#7a4a1e")
+    + ship(258,150,1.05,"#6b4423","#f3efe3",G) + skull(266,R(0.52),1.0,"#d8e0ee");
+  if(k==="volcano") return `<path d="M0 ${H} L70 ${H-150} L150 ${H-60} L${W} ${H-120} L${W} ${H} Z" fill="${A}" opacity="0.10"/>`
+    + volcano(48,H-22,1.2,"#5a2a20",G,"#ffce54") + volcano(262,R(0.4),0.8,"#5a2a20",G,"#ffce54") + embers(W,H,G);
+  if(k==="jungle") return ambient("leaves",W,H,t)
+    + temple(46,H-20,1.05,N2,N) + bigLeaf(26,140,1.3,N) + bigLeaf(276,270,1.3,N) + bigLeaf(278,R(0.62),1.05,N);
+  if(k==="desert") return ambient("dunes",W,H,t)
+    + sun(262,66,1.05,G) + pyramid(44,H-20,1.3,N,N2) + cactus(272,H-28,1.05,N2) + cactus(26,R(0.46),0.85,N2);
+  if(k==="arctic") return ambient("snow",W,H,t) + aurora(W,H,A)
+    + berg(44,H-20,1.25,N,N2) + berg(270,R(0.5),0.95,N,N2) + berg(274,H-26,0.8,N,N2);
+  if(k==="space") return ambient("stars",W,H,t)
+    + planet(256,96,1.0,N2,G) + rocket(40,R(0.42),1.15,N,N2,"#ff7a1a") + planet(48,H-42,0.7,A,G);
+  if(k==="summit") return `<path d="M0 ${H} L80 ${H-120} L160 ${H-40} L${W} ${H-110} L${W} ${H} Z" fill="${A}" opacity="0.10"/>`
+    + peak(48,H-18,1.25,N2,"#f3efe3") + peak(262,R(0.42),0.9,N2,"#f3efe3") + pine(26,H-24,0.9,N2) + cloud(256,90,1.0,N) + cloud(64,150,0.8,N);
+  if(k==="neon") return ambient("stars",W,H,t) + skyline(W,H,A,G) + moon(256,74,1.0,A);
   return "";
 }
 
@@ -912,17 +972,29 @@ function mapStop(p, st, t, dow, dnum){
   const {x,y}=p;
   const lblColor = st.collected||st.isChest&&st.collected ? t.trail : "#9aa6c0";
   if(st.isChest){
-    const glow = st.collected?`<circle cx="${x}" cy="${y-1}" r="30" fill="${t.trail}" opacity="0.28" filter="url(#glow${t.id})"/>`:"";
-    const ring = (st.isToday&&!st.collected)?`<circle cx="${x}" cy="${y-1}" r="30" fill="none" stroke="${t.accent}" stroke-width="3" class="map-here"/>`:"";
-    const spark = st.collected?`<g fill="${t.trail}"><path d="M${x-30} ${y-22} l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z"/><path d="M${x+27} ${y-18} l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6z"/></g>`:"";
-    const chest = `
-      <ellipse cx="${x}" cy="${y+18}" rx="27" ry="6" fill="#000" opacity="0.3"/>
-      <path d="M${x-23} ${y-2} Q${x-23} ${y-17} ${x} ${y-17} Q${x+23} ${y-17} ${x+23} ${y-2} Z" fill="#a9702f" stroke="#5e3c18" stroke-width="2"/>
-      <rect x="${x-23}" y="${y-3}" width="46" height="21" rx="4" fill="#8a5a2b" stroke="#5e3c18" stroke-width="2"/>
-      <rect x="${x-23}" y="${y-3}" width="46" height="5" fill="${t.trail}"/>
-      <rect x="${x-5}" y="${y-6}" width="10" height="12" rx="2" fill="${t.trail}" stroke="#5e3c18" stroke-width="1.5"/>`;
-    const lbl = `<text x="${x}" y="${y+35}" text-anchor="middle" class="map-lbl" fill="${t.trail}">${st.collected?"REWARD ✓":"CHEST"}</text>`;
-    return `${glow}${ring}${chest}${spark}${lbl}`;
+    const g=t.trail, ink=t.ink;
+    const banner = `<rect x="${x-33}" y="${y+30}" width="66" height="18" rx="4" fill="${st.collected?g:"#141b2e"}" stroke="${g}" stroke-width="1.5"/><text x="${x}" y="${y+42.5}" text-anchor="middle" class="map-lbl" fill="${st.collected?ink:g}">${st.collected?"REWARD ✓":"TREASURE"}</text>`;
+    const base = `<ellipse cx="${x}" cy="${y+22}" rx="32" ry="6" fill="#000" opacity="0.3"/>
+      <rect x="${x-27}" y="${y-1}" width="54" height="23" rx="4" fill="#8a5a2b" stroke="#5e3c18" stroke-width="2.5"/>
+      <rect x="${x-27}" y="${y+7}" width="54" height="5" fill="${g}"/>`;
+    if(st.collected){
+      return `<ellipse cx="${x}" cy="${y-2}" rx="44" ry="34" fill="${g}" opacity="0.2" filter="url(#glow${t.id})"/>
+        <path d="M${x-27} ${y-1} Q${x-27} ${y-22} ${x} ${y-22} Q${x+27} ${y-22} ${x+27} ${y-1} Z" fill="#a9702f" stroke="#5e3c18" stroke-width="2.5" transform="rotate(-24 ${x-25} ${y-1})"/>
+        ${base}
+        <ellipse cx="${x-14}" cy="${y+3}" rx="7" ry="4" fill="${g}" stroke="#b8862c" stroke-width="1"/>
+        <ellipse cx="${x-1}" cy="${y+5}" rx="8" ry="4.5" fill="#ffe9a8" stroke="#b8862c" stroke-width="1"/>
+        <ellipse cx="${x+14}" cy="${y+3}" rx="7" ry="4" fill="${g}" stroke="#b8862c" stroke-width="1"/>
+        <circle cx="${x-5}" cy="${y-2}" r="3.6" fill="#7fdfff" stroke="#fff" stroke-width="0.8"/>
+        <path d="M${x+7} ${y-4} l3.4 4.6 -3.4 4.6 -3.4 -4.6z" fill="#ff6ad5" stroke="#fff" stroke-width="0.6"/>
+        <g fill="${g}"><path d="M${x-35} ${y-24} l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z"/><path d="M${x+31} ${y-20} l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6z"/><path d="M${x-2} ${y-34} l1.4 3.6 3.6 1.4 -3.6 1.4 -1.4 3.6 -1.4 -3.6 -3.6 -1.4 3.6 -1.4z"/></g>
+        ${banner}`;
+    }
+    const ring = st.isToday?`<circle cx="${x}" cy="${y+8}" r="31" fill="none" stroke="${t.accent}" stroke-width="3" class="map-here"/>`:"";
+    return `${ring}${base}
+      <path d="M${x-27} ${y-1} Q${x-27} ${y-19} ${x} ${y-19} Q${x+27} ${y-19} ${x+27} ${y-1} Z" fill="#a9702f" stroke="#5e3c18" stroke-width="2.5"/>
+      <rect x="${x-5}" y="${y+1}" width="10" height="12" rx="2" fill="${g}" stroke="#5e3c18" stroke-width="1.5"/>
+      <circle cx="${x}" cy="${y+6}" r="2" fill="#5e3c18"/>
+      ${banner}`;
   }
   let inner;
   if(st.collected){
@@ -977,7 +1049,7 @@ function pageWeek(w, idx){
       <filter id="glow${idx}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     </defs>
     <rect x="0" y="0" width="${W}" height="${H}" fill="url(#sky${idx})"/>
-    ${motifSVG(t,W,H)}
+    ${scenerySVG(t,W,H)}
     <path d="${full}" fill="none" stroke="${t.node2}" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round" opacity="0.75"/>
     ${traveled?`<path d="${traveled}" fill="none" stroke="${t.trail}" stroke-width="4" stroke-dasharray="2 9" stroke-linecap="round"/>`:""}
     ${stops}
