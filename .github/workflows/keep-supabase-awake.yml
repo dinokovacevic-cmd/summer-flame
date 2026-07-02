@@ -1,0 +1,24 @@
+name: Keep Supabase awake
+
+# Besplatni Supabase projekt se "uspava" nakon 7 dana bez ijednog zahtjeva.
+# Ovaj workflow svaki dan pošalje jedan lagani upit da projekt ostane budan.
+# Radi na GitHubovim serverima (ne treba tvoje računalo ni Claude).
+
+on:
+  schedule:
+    - cron: "23 5 * * *"    # svaki dan oko 05:23 UTC
+    - cron: "23 17 * * *"   # i oko 17:23 UTC (pričuva ako GitHub preskoči jutarnji)
+  workflow_dispatch:         # omogućuje ručno pokretanje iz Actions taba
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST
+        run: |
+          KEY="sb_publishable_svm4lcaPRYWDAUbkEvr9cQ_w_x53-ww"   # publishable (javan) ključ
+          code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            "https://ihpeqafzhecqoqfwkzam.supabase.co/rest/v1/scores?select=player_id&limit=1" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+          echo "Supabase responded: $code"
+          test "$code" = "200"
