@@ -301,6 +301,54 @@ button{font-family:var(--font); cursor:pointer}
   background:var(--panel2);border:1px solid var(--line2);color:var(--text);padding:11px 16px;border-radius:12px;
   font-size:13px;opacity:0;transition:.25s;pointer-events:none;box-shadow:var(--shadow);max-width:88%;text-align:center}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ---------- PAGER NAV (obvious paging) ---------- */
+.pnav{position:absolute;top:46%;z-index:20;width:40px;height:40px;border-radius:50%;border:1px solid var(--line2);
+  background:rgba(20,27,46,.85);color:var(--gold);font-size:24px;line-height:1;display:grid;place-items:center;
+  box-shadow:0 6px 18px rgba(0,0,0,.45);backdrop-filter:blur(3px);padding-bottom:3px}
+.pnav-prev{left:8px} .pnav-next{right:8px}
+.pnav:active{transform:scale(.9)}
+.pnav.next-pulse{animation:navPulse 1.6s ease-in-out infinite}
+@keyframes navPulse{0%,100%{box-shadow:0 6px 18px rgba(0,0,0,.45)}50%{box-shadow:0 0 0 6px rgba(233,196,106,.16),0 6px 18px rgba(0,0,0,.45)}}
+.dots{gap:7px;padding:6px 0 4px}
+.dot{width:7px;height:7px;cursor:pointer}
+.dot.on{width:20px}
+.pagelabel{text-align:center;font-family:var(--disp);font-weight:700;font-size:11.5px;letter-spacing:.08em;
+  color:var(--muted);padding:8px 0 0;text-transform:uppercase}
+
+/* ---------- HOME extras ---------- */
+.legend-row .lt{font-size:15px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.legend-row .ld{font-size:13px;margin-top:4px;line-height:1.5}
+.pts{font-family:var(--disp);font-weight:700;font-size:13px;padding:2px 8px;border-radius:999px;letter-spacing:.02em}
+.pts-y{color:#1a1204;background:var(--stamp-yellow)}
+.pts-o{color:#1a1204;background:var(--stamp-orange)}
+.pts-r{color:#fff;background:var(--stamp-red)}
+.rw-h{font-family:var(--disp);margin:2px 0 8px;font-size:17px}
+.rw-sub{font-size:12px;color:var(--muted);margin:6px 0 0}
+.swipe-cue{display:flex;align-items:center;justify-content:center;gap:9px;margin:18px 4px 2px;padding:12px;
+  border-radius:12px;background:rgba(233,196,106,.08);border:1px solid rgba(233,196,106,.25);
+  color:var(--gold2);font-family:var(--disp);font-weight:700;letter-spacing:.05em;font-size:13.5px;transition:opacity .3s}
+.swipe-cue.gone{opacity:0}
+.swipe-cue .chev{color:var(--gold);animation:swipeChev 1.2s ease-in-out infinite}
+@keyframes swipeChev{0%,100%{transform:translateX(0);opacity:.5}50%{transform:translateX(6px);opacity:1}}
+
+/* ---------- WEEK MAP ---------- */
+.wkpage{padding:14px 12px 22px}
+.wk-head{display:flex;justify-content:space-between;align-items:baseline;padding:2px 4px 10px}
+.wk-head .wn{font-family:var(--disp);font-weight:700;font-size:23px}
+.wk-head .wr{font-size:11.5px;color:var(--muted);letter-spacing:.03em;margin-top:3px}
+.wk-chip{display:inline-block;margin:0 4px 10px;padding:6px 12px;border-radius:999px;
+  background:rgba(233,196,106,.1);border:1px solid rgba(233,196,106,.3);color:var(--gold2);
+  font-size:12px;font-family:var(--disp);font-weight:600}
+.wkmap-wrap{border:1px solid var(--line2);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+.wkmap{display:block;width:100%}
+.map-lbl{font-family:var(--disp);font-weight:700;font-size:11px;letter-spacing:.04em}
+.map-here-lbl{font-family:var(--disp);font-weight:700;font-size:9px;letter-spacing:.09em}
+.map-here{animation:mapPulse 1.4s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes mapPulse{0%,100%{opacity:1}50%{opacity:.4}}
+.wk-foot{margin-top:12px}
+.wk-hint{font-size:12.5px;color:var(--muted);line-height:1.5;text-align:center;padding:0 8px}
+.wk-hint b{color:var(--gold2)}
 </style>
 </head>
 <body>
@@ -374,7 +422,7 @@ function ffVenueCode(venueId){
 function ffCheckCode(venueId,input){ const c=String(input||"").replace(/\D/g,""); return c.length===4 && c===ffVenueCode(venueId); }
 
 /* ---- PRAVILA IGRE (kampanja, pečati, bodovi) ---------------------------- */
-const FF_CAMPAIGN = { start:"2026-07-01", end:"2026-08-31" };
+const FF_CAMPAIGN = { start:"2026-07-06", end:"2026-08-31" };  // Tjedan 1 kreće u ponedjeljak 6.7. (ovaj tjedan isključen)
 function ffParse(s){ const [y,m,d]=s.split("-").map(Number); return new Date(y,m-1,d); }
 function ffFmt(dt){ return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`; }
 function ffAddDays(dt,n){ const x=new Date(dt); x.setDate(x.getDate()+n); return x; }
@@ -504,7 +552,8 @@ function genPassportNo(){ return "FF-"+String(Math.floor(100000+Math.random()*89
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
 /* flame stamp svg (colored by currentColor) */
-function flameSVG(){ return '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c1 3.2-.6 4.6-2 6.2C8.3 10.2 7 12 7 14.2A5 5 0 0 0 17 14.4c0-1.7-.8-3-1.7-4.2-.3 1-1 1.7-1.9 1.9.8-2.2.6-5-1.4-7.1-.3-.3-.6-.6-1-1z"/></svg>'; }
+const FLAME_PATH = "M12 2c1 3.2-.6 4.6-2 6.2C8.3 10.2 7 12 7 14.2A5 5 0 0 0 17 14.4c0-1.7-.8-3-1.7-4.2-.3 1-1 1.7-1.9 1.9.8-2.2.6-5-1.4-7.1-.3-.3-.6-.6-1-1z";
+function flameSVG(){ return `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="${FLAME_PATH}"/></svg>`; }
 
 /* =====================================================================
    RENDER ROOT
@@ -592,7 +641,10 @@ function renderApp(){
     ${topbar()}
     <div class="viewwrap">
       <div class="view ${VIEW==="passport"?"":"off"}" id="view-pass">
+        <button class="pnav pnav-prev hidden" id="navPrev" aria-label="Previous page">‹</button>
+        <button class="pnav pnav-next" id="navNext" aria-label="Next page">›</button>
         <div class="pager" id="pager"></div>
+        <div class="pagelabel" id="pageLabel"></div>
         <div class="dots" id="dots"></div>
       </div>
       <div class="view ${VIEW==="leaderboard"?"":"off"}" id="view-lb"></div>
@@ -609,6 +661,8 @@ function renderApp(){
   wireSheet();
   wireSettings();
   pushScore();            // sinkroniziraj svoj rezultat pri otvaranju
+  // uvijek kreni od Overview stranice (preglednik zna vratiti staru poziciju)
+  const _pg=el("pager"); if(_pg){ _pg.scrollLeft=0; requestAnimationFrame(()=>{ if(el("pager")) el("pager").scrollLeft=0; }); }
 }
 
 function settingsSheet(){
@@ -684,15 +738,35 @@ function wireTabs(){
 function buildPages(){
   const sc = ffScore(S.days);
   const weeks = ffCampaignWeeks();
-  const pages = [ pageDanas(sc, weeks), pageGuide() ].concat(weeks.map(w=>pageWeek(w)));
+  const labels = ["Overview"].concat(weeks.map(w=>`Week ${w.index}`));
+  const pages = [ pageHome(sc, weeks) ].concat(weeks.map((w,i)=>pageWeek(w,i)));
   el("pager").innerHTML = pages.join("");
-  // dots
-  el("dots").innerHTML = pages.map((_,i)=>`<span class="dot ${i===0?"on":""}"></span>`).join("");
-  const pager=el("pager"), dots=[...document.querySelectorAll("#dots .dot")];
-  pager.onscroll=()=>{ const i=Math.round(pager.scrollLeft/pager.clientWidth);
-    dots.forEach((d,k)=>d.classList.toggle("on",k===i)); };
+  el("dots").innerHTML = pages.map((_,i)=>`<span class="dot ${i===0?"on":""}" data-i="${i}"></span>`).join("");
+  wirePager(labels);
   // wire record button
   const rb=el("recordBtn"); if(rb) rb.onclick=openSheet;
+}
+
+/* Listanje: strelice + klikabilne točkice + labela stranice; skriva swipe cue. */
+function wirePager(labels){
+  const pager=el("pager"); if(!pager) return;
+  const dots=[...document.querySelectorAll("#dots .dot")];
+  const n=labels.length;
+  const cur=()=>Math.round(pager.scrollLeft/pager.clientWidth);
+  const go=(i)=>{ i=Math.max(0,Math.min(n-1,i)); pager.scrollTo({left:i*pager.clientWidth,behavior:"smooth"}); };
+  const update=()=>{
+    const i=cur();
+    dots.forEach((d,k)=>d.classList.toggle("on",k===i));
+    if(el("pageLabel")) el("pageLabel").textContent = i===0 ? (labels[0]+"  ·  swipe for your weeks →") : labels[i];
+    if(el("navPrev")) el("navPrev").classList.toggle("hidden", i<=0);
+    if(el("navNext")) el("navNext").classList.toggle("hidden", i>=n-1);
+    if(i>0){ const c=el("swipeCue"); if(c) c.classList.add("gone"); }
+  };
+  pager.onscroll=update;
+  if(el("navPrev")) el("navPrev").onclick=()=>go(cur()-1);
+  if(el("navNext")) el("navNext").onclick=()=>go(cur()+1);
+  dots.forEach(d=>d.onclick=()=>go(+d.dataset.i));
+  update();
 }
 
 function todayStatus(){
@@ -710,7 +784,7 @@ function currentStreak(days, weekStart, todayStr){
   return run;
 }
 
-function pageDanas(sc, weeks){
+function pageHome(sc, weeks){
   const v = ffVenueById(S.venueId);
   const ts = todayStatus();
 
@@ -718,7 +792,7 @@ function pageDanas(sc, weeks){
   let recBlock="";
   if(!ts.active){
     const before = ts.today < FF_CAMPAIGN.start;
-    recBlock = `<div class="date-chip">🔥 ${before?"Summer Flame starts July 1, 2026.":"Summer is over — your passport stays as a keepsake."}</div>`;
+    recBlock = `<div class="date-chip">🔥 ${before?("Summer Flame starts "+fmtDateLong(FF_CAMPAIGN.start)):"Summer is over — your passport stays as a keepsake."}</div>`;
   } else if(ts.rec){
     recBlock = `
       <div class="today-stamps">
@@ -730,39 +804,40 @@ function pageDanas(sc, weeks){
     recBlock = `<button class="btn fire record-btn" id="recordBtn">🔥 Record today's visit</button>`;
   }
 
-  // simple quests = the three stamps, plainly explained
-  const quests = `
-    <div class="eyebrow" style="margin-bottom:6px">Today's quests</div>
-    <div class="quests">
-      <div class="quest">
-        <div class="qi" style="color:var(--stamp-yellow)">${flameSVG()}</div>
-        <div style="flex:1">
-          <div class="qt">Yellow stamp — Show up</div>
-          <div class="qs">Just come in today. <b>+1 point.</b></div>
-        </div>
+  // Big, clear rules (moved from the old guide page)
+  const rules = `
+    <div class="card"><div class="eyebrow" style="margin-bottom:4px">How to earn points</div>
+      <div class="legend-row lg-y">
+        <div class="stamp"><div class="rot"></div>${flameSVG()}</div>
+        <div><div class="lt">Show up <span class="pts pts-y">+1</span></div>
+             <div class="ld">Come in and play. You get one stamp for every day you visit.</div></div>
       </div>
-      <div class="quest">
-        <div class="qi" style="color:var(--stamp-orange)">${flameSVG()}</div>
-        <div style="flex:1">
-          <div class="qt">Orange stamp — Play together</div>
-          <div class="qs">Every extra person who comes and plays with you = <b>+2 points.</b></div>
-        </div>
+      <div class="legend-row lg-o">
+        <div class="stamp"><div class="rot"></div>${flameSVG()}</div>
+        <div><div class="lt">Play together <span class="pts pts-o">+2 each</span></div>
+             <div class="ld">Every extra friend who comes and plays with you adds +2 points.</div></div>
       </div>
-      <div class="quest">
-        <div class="qi" style="color:var(--stamp-red)">${flameSVG()}</div>
-        <div style="flex:1">
-          <div class="qt">Red stamp — Attendance streak</div>
-          <div class="qs">3 days in a row = <b>+3</b>, 5 days in a row = <b>+10</b>, 7 days in a row = <b>+15</b>.</div>
-        </div>
+      <div class="legend-row lg-r">
+        <div class="stamp"><div class="rot"></div>${flameSVG()}</div>
+        <div><div class="lt">Come in a streak <span class="pts pts-r">+3 · +10 · +15</span></div>
+             <div class="ld">Visit several days in a row: 3 days = +3, 5 days = +10, 7 days = +15.</div></div>
       </div>
     </div>`;
 
   const rewards = `
-    <div class="eyebrow" style="margin-bottom:8px">Rewards</div>
-    <div class="reward-note">🎮 <b>Every 10 points = 1 hour of free play</b> — paid out at the end of each week.</div>
-    <div class="reward-note" style="margin-top:10px">🏆 <b>On Aug 31</b> the summer leaderboard pays out:<br/>&nbsp;&nbsp;• Top 10 players — 1st place <b>10h</b> of play, 2nd <b>9h</b> … down to 10th <b>1h</b>.<br/>&nbsp;&nbsp;• Best Friendly Fire — <b>1 week of 50% off</b> play after Aug 31.</div>`;
+    <div class="card"><div class="eyebrow" style="margin-bottom:4px">Rewards</div>
+      <h3 class="rw-h">🎮 Weekly free play</h3>
+      <div class="reward"><span>Every 10 points</span><span class="rv">1 hour of play</span></div>
+      <div class="rw-sub">Paid out at the end of each week.</div>
+      <h3 class="rw-h" style="margin-top:18px">🏆 End of summer · Aug 31</h3>
+      <div class="reward"><span>🥇 1st place</span><span class="rv">10 hours</span></div>
+      <div class="reward"><span>🥈 2nd place</span><span class="rv">9 hours</span></div>
+      <div class="reward"><span>🥉 3rd place</span><span class="rv">8 hours</span></div>
+      <div class="reward"><span>… down to 10th</span><span class="rv">1 hour</span></div>
+      <div class="reward"><span>🏟️ Best FF Arena</span><span class="rv">1 week 50% off</span></div>
+    </div>`;
 
-  return `<div class="page"><div class="card"><div class="edge"></div>
+  return `<div class="page"><div class="card hero"><div class="edge"></div>
       <div class="today-head">
         <div class="who">
           <div class="nm">${esc(S.name)}</div>
@@ -771,88 +846,160 @@ function pageDanas(sc, weeks){
         </div>
         <div class="score"><div class="v">${sc.total}</div><div class="l">points</div></div>
       </div>
-      <div class="date-chip">🗓️ Today · ${fmtDateLong(ts.today)}</div>
+      <div class="date-chip">🗓️ ${fmtDateLong(ts.today)}</div>
       ${recBlock}
     </div>
-    <div class="card">${quests}</div>
-    <div class="card">${rewards}</div>
+    ${rules}
+    ${rewards}
+    <div class="swipe-cue" id="swipeCue">Open your weekly passport <span class="chev">›››</span></div>
   </div>`;
 }
 
-function pageGuide(){
-  return `<div class="page">
-    <div class="card"><div class="edge"></div>
-      <div class="eyebrow">Guide</div>
-      <h3 style="font-family:var(--disp);margin:6px 0 4px;font-size:19px">How to collect stamps</h3>
-      <p style="color:var(--muted);font-size:13px;margin:0 0 8px">Every visit is confirmed by a staff member with the daily code. No confirmation, no stamp.</p>
-      <div class="legend-row lg-y">
-        <div class="stamp"><div class="rot"></div>${flameSVG()}</div>
-        <div><div class="lt">Yellow stamp — Show up</div><div class="ld"><b>+1 point.</b> Just come in that day — alone or with friends.</div></div>
-      </div>
-      <div class="legend-row lg-o">
-        <div class="stamp"><div class="rot"></div>${flameSVG()}</div>
-        <div><div class="lt">Orange stamp — Play together</div><div class="ld"><b>+2 points</b> for every extra person who comes and plays with you.</div></div>
-      </div>
-      <div class="legend-row lg-r">
-        <div class="stamp"><div class="rot"></div>${flameSVG()}</div>
-        <div><div class="lt">Red stamp — Attendance streak</div><div class="ld"><b>3 days in a row = +3</b>, 5 days in a row = +10, 7 days in a row = +15.</div></div>
-      </div>
-    </div>
-    <div class="card">
-      <div class="eyebrow">Rewards</div>
-      <h3 style="font-family:var(--disp);margin:6px 0 8px;font-size:19px">Weekly play time</h3>
-      <div class="reward"><span>Every 10 points</span><span class="rv">1 hour of play</span></div>
-      <div style="font-size:12px;color:var(--muted);margin:6px 0 0">Paid out at the end of each week.</div>
-      <h3 style="font-family:var(--disp);margin:16px 0 8px;font-size:19px">End of summer — Aug 31 leaderboard</h3>
-      <div class="reward"><span>1st place</span><span class="rv">10 hours of play</span></div>
-      <div class="reward"><span>2nd place</span><span class="rv">9 hours of play</span></div>
-      <div class="reward"><span>3rd place</span><span class="rv">8 hours of play</span></div>
-      <div class="reward"><span>… down to 10th place</span><span class="rv">1 hour of play</span></div>
-      <div class="reward"><span>🏟️ Best Friendly Fire</span><span class="rv">1 week of 50% off</span></div>
-    </div>
-  </div>`;
+/* ---------- ADVENTURE MAP (tjedne stranice putovnice) ----------
+   Svaki tjedan = mapa s drukčijom temom. 7 stopova (dani) povezanih isprekidanom
+   rutom; zadnji dan = škrinja s blagom (tjedna nagrada). */
+const WEEK_THEMES = [
+  { name:"Treasure Isles", sky:["#123047","#0b1a2b"], trail:"#ffd76a", node:"#e6c67a", node2:"#b8862c", accent:"#37c4d6", ink:"#0b1a2b", motif:"waves"   },
+  { name:"Ember Ridge",    sky:["#2c1012","#160a10"], trail:"#ffd15a", node:"#ff9a4d", node2:"#b3311a", accent:"#ff5a2c", ink:"#2a0d0d", motif:"peaks"   },
+  { name:"Lost Jungle",    sky:["#0e2a1a","#08160f"], trail:"#e6f79a", node:"#7fd28c", node2:"#2f8b4d", accent:"#37d98a", ink:"#0b1c12", motif:"leaves"  },
+  { name:"Golden Dunes",   sky:["#2b2009","#181005"], trail:"#ffe6a0", node:"#f0c879", node2:"#c58a2c", accent:"#f2a23c", ink:"#241a08", motif:"dunes"   },
+  { name:"Frozen North",   sky:["#0d2436","#0a1622"], trail:"#bfe9ff", node:"#bfe1f2", node2:"#4f8fb8", accent:"#7fdfff", ink:"#0c1b28", motif:"waves"   },
+  { name:"Star Voyage",    sky:["#1a1030","#0e0a1c"], trail:"#e5c7ff", node:"#b48cf0", node2:"#5a34a8", accent:"#c08bff", ink:"#140c26", motif:"stars"   },
+  { name:"Summit Trail",   sky:["#182430","#0e151d"], trail:"#dfe9f5", node:"#9fb4cf", node2:"#4a5f80", accent:"#8fb0e0", ink:"#111a24", motif:"peaks"   },
+  { name:"Neon Nights",    sky:["#241033","#120a1e"], trail:"#7ff0ff", node:"#ff6ad5", node2:"#7a2bb0", accent:"#7ff0ff", ink:"#160a24", motif:"skyline" },
+];
+
+function motifSVG(t, W, H){
+  const a=t.accent, n2=t.node2;
+  if(t.motif==="waves"){
+    let s=""; for(let i=0;i<Math.ceil(H/70);i++){ const y=70+i*70;
+      s+=`<path d="M0 ${y} q 38 -13 75 0 t 75 0 t 75 0 t 75 0" fill="none" stroke="${a}" stroke-width="2" opacity="0.15"/>`; }
+    return s;
+  }
+  if(t.motif==="peaks"){
+    return `<path d="M0 ${H} L60 ${H-160} L120 ${H-70} L185 ${H-210} L245 ${H-90} L${W} ${H-160} L${W} ${H} Z" fill="${a}" opacity="0.13"/>
+      <path d="M0 ${H} L45 ${H-95} L115 ${H-30} L175 ${H-130} L235 ${H-45} L${W} ${H-95} L${W} ${H} Z" fill="${a}" opacity="0.09"/>`;
+  }
+  if(t.motif==="leaves"){
+    let s=""; const pts=[[32,110],[262,170],[46,330],[256,400],[38,540],[258,590],[150,700],[40,760]];
+    for(const [x,y] of pts){ if(y>H-20) continue; s+=`<g transform="translate(${x} ${y}) rotate(${(x+y)%90})" opacity="0.16"><path d="M0 0 Q15 -11 30 0 Q15 11 0 0 Z" fill="${a}"/><line x1="0" y1="0" x2="30" y2="0" stroke="${n2}" stroke-width="1"/></g>`; }
+    return s;
+  }
+  if(t.motif==="dunes"){
+    let s=""; for(let i=0;i<Math.ceil(H/120);i++){ const y=130+i*120;
+      s+=`<path d="M0 ${y} q 90 -42 155 0 q 65 40 160 0 L${W} ${H} L0 ${H} Z" fill="${a}" opacity="${0.05+(i%2)*0.03}"/>`; }
+    return s;
+  }
+  if(t.motif==="stars"){
+    let s=`<circle cx="238" cy="86" r="24" fill="${a}" opacity="0.16"/><circle cx="248" cy="79" r="19" fill="${t.sky[0]}"/>`;
+    for(let i=0;i<46;i++){ const x=(i*89%288)+6, y=(i*151%(H-30))+16, r=(i%4===0?1.7:1);
+      s+=`<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" opacity="0.55"/>`; }
+    return s;
+  }
+  if(t.motif==="skyline"){
+    let s="", x=0, i=0;
+    while(x<W){ const bw=20+(i*13%22), bh=70+(i*47%170);
+      s+=`<rect x="${x}" y="${H-bh}" width="${bw-4}" height="${bh}" fill="${a}" opacity="0.12"/>`;
+      for(let wy=H-bh+8; wy<H-8; wy+=16){ s+=`<rect x="${x+3}" y="${wy}" width="3" height="4" fill="${t.trail}" opacity="0.18"/>`; }
+      x+=bw; i++; }
+    return s;
+  }
+  return "";
 }
 
-function pageWeek(w){
-  const sc = ffScore(S.days);
-  const red = sc.perWeekRed[w.index]||0;
+/* Jedan stop na mapi (medaljon ili škrinja za zadnji dan). */
+function mapStop(p, st, t, dow, dnum){
+  const {x,y}=p;
+  const lblColor = st.collected||st.isChest&&st.collected ? t.trail : "#9aa6c0";
+  if(st.isChest){
+    const glow = st.collected?`<circle cx="${x}" cy="${y-1}" r="30" fill="${t.trail}" opacity="0.28" filter="url(#glow${t.id})"/>`:"";
+    const ring = (st.isToday&&!st.collected)?`<circle cx="${x}" cy="${y-1}" r="30" fill="none" stroke="${t.accent}" stroke-width="3" class="map-here"/>`:"";
+    const spark = st.collected?`<g fill="${t.trail}"><path d="M${x-30} ${y-22} l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z"/><path d="M${x+27} ${y-18} l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6z"/></g>`:"";
+    const chest = `
+      <ellipse cx="${x}" cy="${y+18}" rx="27" ry="6" fill="#000" opacity="0.3"/>
+      <path d="M${x-23} ${y-2} Q${x-23} ${y-17} ${x} ${y-17} Q${x+23} ${y-17} ${x+23} ${y-2} Z" fill="#a9702f" stroke="#5e3c18" stroke-width="2"/>
+      <rect x="${x-23}" y="${y-3}" width="46" height="21" rx="4" fill="#8a5a2b" stroke="#5e3c18" stroke-width="2"/>
+      <rect x="${x-23}" y="${y-3}" width="46" height="5" fill="${t.trail}"/>
+      <rect x="${x-5}" y="${y-6}" width="10" height="12" rx="2" fill="${t.trail}" stroke="#5e3c18" stroke-width="1.5"/>`;
+    const lbl = `<text x="${x}" y="${y+35}" text-anchor="middle" class="map-lbl" fill="${t.trail}">${st.collected?"REWARD ✓":"CHEST"}</text>`;
+    return `${glow}${ring}${chest}${spark}${lbl}`;
+  }
+  let inner;
+  if(st.collected){
+    inner = `<circle cx="${x}" cy="${y}" r="21" fill="url(#ng${t.id})" stroke="${t.trail}" stroke-width="3"/>
+      <svg x="${x-11}" y="${y-12}" width="22" height="22" viewBox="0 0 24 24"><path d="${FLAME_PATH}" fill="${t.ink}"/></svg>
+      ${st.squad?`<circle cx="${x+15}" cy="${y-15}" r="6.5" fill="var(--stamp-orange)" stroke="#fff" stroke-width="1.5"/>`:""}
+      <g transform="translate(${x+11} ${y-30})"><rect x="0" y="0" width="2.4" height="18" fill="${t.node2}"/><path d="M2.4 0 L15 4.5 L2.4 9 Z" fill="${t.trail}"/></g>`;
+  } else if(st.isToday){
+    inner = `<circle cx="${x}" cy="${y}" r="21" fill="${t.sky[0]}" stroke="${t.accent}" stroke-width="3" class="map-here"/>
+      <circle cx="${x}" cy="${y}" r="6" fill="${t.accent}"/>
+      <text x="${x}" y="${y-30}" text-anchor="middle" class="map-here-lbl" fill="${t.accent}">YOU ARE HERE</text>`;
+  } else {
+    inner = `<circle cx="${x}" cy="${y}" r="19" fill="${t.sky[0]}" stroke="${t.node2}" stroke-width="2" stroke-dasharray="4 4" opacity="0.85"/>`;
+  }
+  const lbl = `<text x="${x}" y="${y+35}" text-anchor="middle" class="map-lbl" fill="${lblColor}">${dow} ${dnum}</text>`;
+  return inner+lbl;
+}
+
+function pageWeek(w, idx){
+  const t = { ...WEEK_THEMES[idx % WEEK_THEMES.length], id: idx };
+  const today = ffToday();
   const wkPts = ffWeekPoints(S.days, w);
   const rewardHours = ffWeeklyRewardHours(wkPts);
-  const run = ffMaxRun(S.days, w.start, w.end);
-  const today = ffToday();
 
-  // build 7 day cells (Mon..Sun) of the calendar week
-  let cells="";
-  let d=ffParse(w.mondayStart);
-  for(let i=0;i<7;i++){
-    const key=ffFmt(d);
-    const inCamp = ffInCampaign(key);
-    const rec = S.days[key];
-    const isToday = key===today;
-    let stamps="";
-    if(rec&&rec.visit){
-      stamps+='<b style="background:var(--stamp-yellow)"></b>';
-      if(rec.lanTeam) stamps+='<b style="background:var(--stamp-orange)"></b>';
-    }
-    cells += `<div class="day ${inCamp?"":"out"} ${isToday?"today":""}">
-      <div class="dow">${EN_DOW[i]}</div><div class="dn">${d.getDate()}</div>
-      <div class="st">${stamps}</div></div>`;
-    d=ffAddDays(d,1);
-  }
+  // dani ovog tjedna unutar kampanje (clipped Mon..end)
+  const days=[]; { let d=ffParse(w.start); const endD=ffParse(w.end);
+    while(d<=endD){ days.push(ffFmt(d)); d=ffAddDays(d,1); } }
+  const N=days.length;
 
-  const rangeLabel = `${EN_MON[ffParse(w.start).getMonth()].slice(0,3)} ${ffParse(w.start).getDate()} – ${EN_MON[ffParse(w.end).getMonth()].slice(0,3)} ${ffParse(w.end).getDate()}`;
-  return `<div class="page"><div class="card"><div class="edge"></div>
-    <div class="week-head">
-      <div><div class="wn">Week ${w.index}</div><div class="wr">${rangeLabel}</div></div>
+  // pozicije stopova (serpentina, varira po tjednu)
+  const W=300, top=62, gap=84, H=top + (N-1)*gap + 66;
+  const dir = idx%2===0 ? 1 : -1;
+  const amp = 84, freq = 0.82 + (idx%3)*0.16, phase = idx*0.7;
+  const clamp=(x)=>Math.max(60,Math.min(240,x));
+  const pos = days.map((key,i)=>({ x:clamp(150 + dir*amp*Math.sin(i*freq+phase)), y:top+i*gap }));
+
+  // ruta (isprekidana) + "prijeđeni" dio do zadnjeg skupljenog dana
+  let full=`M ${pos[0].x} ${pos[0].y}`; for(let i=1;i<N;i++) full+=` L ${pos[i].x} ${pos[i].y}`;
+  let lastCol=-1; days.forEach((k,i)=>{ if(S.days[k]&&S.days[k].visit) lastCol=i; });
+  let traveled=""; if(lastCol>0){ traveled=`M ${pos[0].x} ${pos[0].y}`; for(let i=1;i<=lastCol;i++) traveled+=` L ${pos[i].x} ${pos[i].y}`; }
+
+  const stops = days.map((key,i)=>{
+    const rec=S.days[key];
+    const st={ collected:!!(rec&&rec.visit), isToday:key===today, isChest:i===N-1, squad:!!(rec&&rec.lanTeam) };
+    return mapStop(pos[i], st, t, EN_DOW[dowIdx(key)], ffParse(key).getDate());
+  }).join("");
+
+  const svg = `<svg class="wkmap" viewBox="0 0 ${W} ${H}" width="100%">
+    <defs>
+      <linearGradient id="sky${idx}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${t.sky[0]}"/><stop offset="1" stop-color="${t.sky[1]}"/></linearGradient>
+      <radialGradient id="ng${idx}" cx="0.4" cy="0.35" r="0.85"><stop offset="0" stop-color="${t.node}"/><stop offset="1" stop-color="${t.node2}"/></radialGradient>
+      <filter id="glow${idx}" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <rect x="0" y="0" width="${W}" height="${H}" fill="url(#sky${idx})"/>
+    ${motifSVG(t,W,H)}
+    <path d="${full}" fill="none" stroke="${t.node2}" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round" opacity="0.75"/>
+    ${traveled?`<path d="${traveled}" fill="none" stroke="${t.trail}" stroke-width="4" stroke-dasharray="2 9" stroke-linecap="round"/>`:""}
+    ${stops}
+  </svg>`;
+
+  const P=ffParse, rangeLabel = `${EN_MON[P(w.start).getMonth()].slice(0,3)} ${P(w.start).getDate()} – ${EN_MON[P(w.end).getMonth()].slice(0,3)} ${P(w.end).getDate()}`;
+  const startsFuture = w.start > today;
+  const isLast = idx === ffCampaignWeeks().length-1;
+  const startChip = startsFuture ? `<div class="wk-chip">🔒 Starts ${fmtDateLong(w.start)}</div>` : "";
+  const foot = rewardHours>=1
+    ? `<div class="week-reward">🎮 Week reward so far: <b>${rewardHours} ${rewardHours===1?"hour":"hours"}</b> of free play</div>`
+    : `<div class="wk-hint">Reach 10 points this week for <b>1 hour</b> of free play — get to the chest at the end of the week to claim it.${isLast?" Final week — Aug 31 grand prizes!":""}</div>`;
+
+  return `<div class="page wkpage">
+    <div class="wk-head">
+      <div><div class="wn">Week ${w.index}</div><div class="wr">${t.name} · ${rangeLabel}</div></div>
       <div class="week-pts">${wkPts} pts</div>
     </div>
-    <div class="days">${cells}</div>
-    <div class="week-red">
-      <span class="stamp lg-r" style="width:24px;height:24px;border-width:1.5px">${flameSVG()}</span>
-      ${run>=3?`${run>=7?"Full week":run+" days"} in a row → red stamp +${red}`:`Longest streak: ${run} — red stamp starts at 3 days in a row`}
-    </div>
-    ${rewardHours>=1?`<div class="week-reward">🎮 Week reward: ${rewardHours} ${rewardHours===1?"hour":"hours"} of free play (10 pts = 1h).</div>`:""}
-  </div></div>`;
+    ${startChip}
+    <div class="wkmap-wrap">${svg}</div>
+    <div class="wk-foot">${foot}</div>
+  </div>`;
 }
 
 /* =====================================================================
