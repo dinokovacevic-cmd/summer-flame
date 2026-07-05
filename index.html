@@ -459,10 +459,32 @@ function ffWeekPoints(days,week){
   while(d<=endD){ const rec=days[ffFmt(d)]; if(rec&&rec.visit){ p+=1; if(rec.lanTeam) p+=ffLanPoints(rec.lanTeam); } d=ffAddDays(d,1); }
   return p+ffRedPoints(ffMaxRun(days,week.start,week.end));
 }
-// Svakih 10 bodova = 1 sat igranja (na kraju tjedna).
-function ffWeeklyRewardHours(points){ return Math.floor((Number(points)||0)/10); }
-// Nagrade na kraju ljeta (31.8.) za top 10 igrača: 1.→10h ... 10.→1h.
+// Svakih 15 bodova = 1 sat igranja (na kraju tjedna).
+function ffWeeklyRewardHours(points){ return Math.floor((Number(points)||0)/15); }
+// Nagrade za top 10 igrača svakog kruga: 1.→10h ... 10.→1h.
 function ffPlayerPrizeHours(rank){ return (rank>=1 && rank<=10) ? (11-rank) : 0; }
+
+/* ---- DVA KRUGA NATJECANJA (leaderboard se resetira 1.8.) -------------------
+   Krug 1 (srpanj) → pobjednici 31.7., nagrada (50% off) u KOLOVOZU.
+   Krug 2 (kolovoz) → pobjednici 31.8., nagrada (50% off) u RUJNU.
+   Leaderboard prikazuje samo bodove tekućeg kruga. */
+const FF_PERIODS = [
+  { key:"jul", start:"2026-07-06", end:"2026-07-31", label:"July round",   prizeMonth:"August"    },
+  { key:"aug", start:"2026-08-01", end:"2026-08-31", label:"August round", prizeMonth:"September" },
+];
+function ffPeriodFor(dateStr){
+  for(const p of FF_PERIODS){ if(dateStr>=p.start && dateStr<=p.end) return p; }
+  if(dateStr < FF_PERIODS[0].start) return FF_PERIODS[0];
+  return FF_PERIODS[FF_PERIODS.length-1];
+}
+/* Bodovi samo unutar [from,to] (za rezultat kruga). Crveni niz se pripisuje
+   krugu u kojem počinje taj tjedan (w.start). */
+function ffScoreRange(days, from, to){
+  days=days||{}; let pts=0;
+  for(const k of Object.keys(days)){ if(k<from||k>to) continue; const rec=days[k]; if(!rec||!rec.visit) continue; pts+=1; if(rec.lanTeam) pts+=ffLanPoints(rec.lanTeam); }
+  for(const w of ffCampaignWeeks()){ if(w.start<from||w.start>to) continue; pts+=ffRedPoints(ffMaxRun(days,w.start,w.end)); }
+  return pts;
+}
 </script>
 
 <script>
@@ -544,14 +566,16 @@ async function sbResetMe(pid, vid){
     });
   }catch(e){ /* offline — rezultat će ostati dok se ponovno ne otvori online */ }
 }
-async function sbPlayers(venueId){
-  const url = `${SB_URL}/rest/v1/scores?venue_id=eq.${encodeURIComponent(venueId)}&select=player_id,nickname,score&order=score.desc,updated_at.asc&limit=100`;
+async function sbPlayers(venueId, since){
+  const sinceQ = since ? `&updated_at=gte.${since}` : "";
+  const url = `${SB_URL}/rest/v1/scores?venue_id=eq.${encodeURIComponent(venueId)}${sinceQ}&select=player_id,nickname,score&order=score.desc,updated_at.asc&limit=100`;
   const r = await fetch(url, { headers: SB_HEADERS });
   if(!r.ok) throw new Error("http "+r.status);
   return await r.json();
 }
-async function sbAll(){
-  const r = await fetch(`${SB_URL}/rest/v1/scores?select=player_id,nickname,venue_id,score`, { headers: SB_HEADERS });
+async function sbAll(since){
+  const sinceQ = since ? `&updated_at=gte.${since}` : "";
+  const r = await fetch(`${SB_URL}/rest/v1/scores?select=player_id,nickname,venue_id,score${sinceQ}`, { headers: SB_HEADERS });
   if(!r.ok) throw new Error("http "+r.status);
   return await r.json();
 }
@@ -574,6 +598,7 @@ function render(){
   S = load();
   if(!S || !S.name){ renderCover(); return; }
   if(!S.playerId){ S.playerId = ffNewId(); save(); }   // migracija starih putovnica
+  if(!S.claims){ S.claims = {}; save(); }               // preuzete tjedne nagrade
   if(!S.venueId){ renderPicker(); return; }
   renderApp();
 }
@@ -597,7 +622,7 @@ function renderCover(){
   const go = ()=>{
     const name = nick.value.trim();
     if(!name){ nick.focus(); nick.style.borderColor="var(--bad)"; return; }
-    S = { version:1, name, passportNo:genPassportNo(), playerId:ffNewId(), venueId:null, createdAt:ffToday(), days:{} };
+    S = { version:1, name, passportNo:genPassportNo(), playerId:ffNewId(), venueId:null, createdAt:ffToday(), days:{}, claims:{} };
     save();
     const c = el("cover"); c.classList.add("gone");
     setTimeout(renderPicker, 520);
@@ -625,9 +650,9 @@ function renderPicker(preselect){
   el("app").innerHTML = `
   <div class="picker">
     <div class="phead"><h2>Where do you play?</h2>
-      <p>${changing?"Change your arcade. Your stamps and points stay saved.":"Pick your Friendly Fire arcade. This is where you collect stamps and appear on the leaderboard."}</p></div>
+      <p>${changing?"Change your arena. Your stamps and points stay saved.":"Pick your Friendly Fire arena. This is where you collect stamps and appear on the leaderboard."}</p></div>
     <div class="plist">${groups}</div>
-    <div class="pfoot"><button class="btn" id="confirmVenue" ${preselect?"":"disabled"}>Confirm arcade</button></div>
+    <div class="pfoot"><button class="btn" id="confirmVenue" ${preselect?"":"disabled"}>Confirm arena</button></div>
   </div>`;
 
   let chosen=preselect||null;
@@ -663,6 +688,7 @@ function renderApp(){
     </div>
     ${tabbar()}
     ${recordSheet()}
+    ${claimSheet()}
     ${settingsSheet()}
     ${successOverlay()}
     <div class="toast" id="toast"></div>
@@ -671,6 +697,7 @@ function renderApp(){
   buildLeaderboard();
   wireTabs();
   wireSheet();
+  wireClaim();
   wireSettings();
   pushScore();            // sinkroniziraj svoj rezultat pri otvaranju
   // uvijek kreni od Overview stranice (preglednik zna vratiti staru poziciju)
@@ -683,7 +710,7 @@ function settingsSheet(){
     <div class="grip"></div>
     <h3>Settings</h3>
     <p class="sh-sub">Passport: <b>${esc(S.name)}</b> · ${esc(S.passportNo)}<br/>${v?ffFlag(v.country)+" "+esc(v.name):""}</p>
-    <button class="btn ghost" id="setChangeVenue">Change arcade</button>
+    <button class="btn ghost" id="setChangeVenue">Change arena</button>
     <button class="btn ghost" id="setReset" style="margin-top:8px;color:var(--bad);border-color:rgba(255,107,107,.4)">Reset passport</button>
     <button class="btn ghost" id="setClose" style="margin-top:8px">Close</button>
   </div></div>`;
@@ -759,6 +786,8 @@ function buildPages(){
   wirePager(labels);
   // wire record button
   const rb=el("recordBtn"); if(rb) rb.onclick=openSheet;
+  // wire "open the chest" claim buttons (one per claimable week)
+  document.querySelectorAll(".claimBtn").forEach(b=> b.onclick=()=>openClaimSheet(+b.dataset.week));
 }
 
 /* Listanje: strelice + klikabilne točkice + labela stranice; skriva swipe cue. */
@@ -841,14 +870,14 @@ function pageHome(sc, weeks){
   const rewards = `
     <div class="card"><div class="eyebrow" style="margin-bottom:4px">Rewards</div>
       <h3 class="rw-h">🎮 Weekly free play</h3>
-      <div class="reward"><span>Every 10 points</span><span class="rv">1 hour of play</span></div>
-      <div class="rw-sub">Paid out at the end of each week.</div>
-      <h3 class="rw-h" style="margin-top:18px">🏆 End of summer · Aug 31</h3>
-      <div class="reward"><span>🥇 1st place</span><span class="rv">10 hours</span></div>
-      <div class="reward"><span>🥈 2nd place</span><span class="rv">9 hours</span></div>
-      <div class="reward"><span>🥉 3rd place</span><span class="rv">8 hours</span></div>
-      <div class="reward"><span>… down to 10th</span><span class="rv">1 hour</span></div>
-      <div class="reward"><span>🏟️ Best FF Arena</span><span class="rv">1 week 50% off</span></div>
+      <div class="reward"><span>Every 15 points</span><span class="rv">1 hour of play</span></div>
+      <div class="rw-sub">At the end of each week, open that week's chest — staff enters the code and gives you the time.</div>
+      <h3 class="rw-h" style="margin-top:18px">🏆 Two prize rounds</h3>
+      <div class="rw-sub" style="margin:0 0 8px">Top 10 players and the best arena are picked twice. The leaderboard resets on Aug 1.</div>
+      <div class="reward"><span>📅 July round · picked Jul 31</span><span class="rv">prizes in Aug</span></div>
+      <div class="reward"><span>📅 August round · picked Aug 31</span><span class="rv">prizes in Sep</span></div>
+      <div class="rw-sub" style="margin-top:10px">Each round: 🥇 1st <b>10h</b> · 2nd <b>9h</b> … 10th <b>1h</b> of play.</div>
+      <div class="reward"><span>🏟️ Best arena of the round</span><span class="rv">1 week 50% off</span></div>
     </div>`;
 
   return `<div class="page"><div class="card hero"><div class="edge"></div>
@@ -973,11 +1002,13 @@ function mapStop(p, st, t, dow, dnum){
   const lblColor = st.collected||st.isChest&&st.collected ? t.trail : "#9aa6c0";
   if(st.isChest){
     const g=t.trail, ink=t.ink;
-    const banner = `<rect x="${x-33}" y="${y+30}" width="66" height="18" rx="4" fill="${st.collected?g:"#141b2e"}" stroke="${g}" stroke-width="1.5"/><text x="${x}" y="${y+42.5}" text-anchor="middle" class="map-lbl" fill="${st.collected?ink:g}">${st.collected?"REWARD ✓":"TREASURE"}</text>`;
+    const label = st.claimed ? "CLAIMED ✓" : (st.claimable ? "OPEN ME" : (st.earned ? "REWARD" : "TREASURE"));
+    const banner = `<rect x="${x-33}" y="${y+30}" width="66" height="18" rx="4" fill="${st.claimed?g:"#141b2e"}" stroke="${g}" stroke-width="1.5"/><text x="${x}" y="${y+42.5}" text-anchor="middle" class="map-lbl" fill="${st.claimed?ink:g}">${label}</text>`;
     const base = `<ellipse cx="${x}" cy="${y+22}" rx="32" ry="6" fill="#000" opacity="0.3"/>
       <rect x="${x-27}" y="${y-1}" width="54" height="23" rx="4" fill="#8a5a2b" stroke="#5e3c18" stroke-width="2.5"/>
       <rect x="${x-27}" y="${y+7}" width="54" height="5" fill="${g}"/>`;
-    if(st.collected){
+    if(st.claimed){
+      // OTVORENA škrinja (nagrada preuzeta) — radnik vidi da je već dana
       return `<ellipse cx="${x}" cy="${y-2}" rx="44" ry="34" fill="${g}" opacity="0.2" filter="url(#glow${t.id})"/>
         <path d="M${x-27} ${y-1} Q${x-27} ${y-22} ${x} ${y-22} Q${x+27} ${y-22} ${x+27} ${y-1} Z" fill="#a9702f" stroke="#5e3c18" stroke-width="2.5" transform="rotate(-24 ${x-25} ${y-1})"/>
         ${base}
@@ -989,11 +1020,13 @@ function mapStop(p, st, t, dow, dnum){
         <g fill="${g}"><path d="M${x-35} ${y-24} l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z"/><path d="M${x+31} ${y-20} l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6z"/><path d="M${x-2} ${y-34} l1.4 3.6 3.6 1.4 -3.6 1.4 -1.4 3.6 -1.4 -3.6 -3.6 -1.4 3.6 -1.4z"/></g>
         ${banner}`;
     }
-    const ring = st.isToday?`<circle cx="${x}" cy="${y+8}" r="31" fill="none" stroke="${t.accent}" stroke-width="3" class="map-here"/>`:"";
-    return `${ring}${base}
+    // ZATVORENA škrinja; ako je spremna za preuzimanje → sjaj + puls "OPEN ME"
+    const glow = st.claimable?`<ellipse cx="${x}" cy="${y-2}" rx="44" ry="34" fill="${g}" opacity="0.18" filter="url(#glow${t.id})"/>`:"";
+    const ring = (st.claimable||st.isToday)?`<circle cx="${x}" cy="${y+8}" r="31" fill="none" stroke="${st.claimable?g:t.accent}" stroke-width="3" class="map-here"/>`:"";
+    const lock = st.claimable?"":`<rect x="${x-5}" y="${y+1}" width="10" height="12" rx="2" fill="${g}" stroke="#5e3c18" stroke-width="1.5"/><circle cx="${x}" cy="${y+6}" r="2" fill="#5e3c18"/>`;
+    return `${glow}${ring}${base}
       <path d="M${x-27} ${y-1} Q${x-27} ${y-19} ${x} ${y-19} Q${x+27} ${y-19} ${x+27} ${y-1} Z" fill="#a9702f" stroke="#5e3c18" stroke-width="2.5"/>
-      <rect x="${x-5}" y="${y+1}" width="10" height="12" rx="2" fill="${g}" stroke="#5e3c18" stroke-width="1.5"/>
-      <circle cx="${x}" cy="${y+6}" r="2" fill="#5e3c18"/>
+      ${lock}
       ${banner}`;
   }
   let inner;
@@ -1018,6 +1051,9 @@ function pageWeek(w, idx){
   const today = ffToday();
   const wkPts = ffWeekPoints(S.days, w);
   const rewardHours = ffWeeklyRewardHours(wkPts);
+  const claimed = !!(S.claims && S.claims[w.index]);        // nagrada preuzeta (kodom)
+  const weekEnded = today > w.end;
+  const claimable = rewardHours>=1 && weekEnded && !claimed;
 
   // dani ovog tjedna unutar kampanje (clipped Mon..end)
   const days=[]; { let d=ffParse(w.start); const endD=ffParse(w.end);
@@ -1039,6 +1075,7 @@ function pageWeek(w, idx){
   const stops = days.map((key,i)=>{
     const rec=S.days[key];
     const st={ collected:!!(rec&&rec.visit), isToday:key===today, isChest:i===N-1, squad:!!(rec&&rec.lanTeam) };
+    if(st.isChest){ st.claimed=claimed; st.claimable=claimable; st.earned=rewardHours>=1; }
     return mapStop(pos[i], st, t, EN_DOW[dowIdx(key)], ffParse(key).getDate());
   }).join("");
 
@@ -1059,9 +1096,17 @@ function pageWeek(w, idx){
   const startsFuture = w.start > today;
   const isLast = idx === ffCampaignWeeks().length-1;
   const startChip = startsFuture ? `<div class="wk-chip">🔒 Starts ${fmtDateLong(w.start)}</div>` : "";
-  const foot = rewardHours>=1
-    ? `<div class="week-reward">🎮 Week reward so far: <b>${rewardHours} ${rewardHours===1?"hour":"hours"}</b> of free play</div>`
-    : `<div class="wk-hint">Reach 10 points this week for <b>1 hour</b> of free play — get to the chest at the end of the week to claim it.${isLast?" Final week — Aug 31 grand prizes!":""}</div>`;
+  let foot;
+  if(claimed){
+    const h=S.claims[w.index].hours;
+    foot = `<div class="week-reward">🎁 Reward claimed: <b>${h} ${h===1?"hour":"hours"}</b> of free play — staff has given it to you.</div>`;
+  } else if(claimable){
+    foot = `<button class="btn fire claimBtn" data-week="${w.index}">🗝️ Open the chest — claim ${rewardHours} ${rewardHours===1?"hour":"hours"}</button>`;
+  } else if(rewardHours>=1){
+    foot = `<div class="week-reward">🎮 This week's reward: <b>${rewardHours} ${rewardHours===1?"hour":"hours"}</b> — open the chest to claim it when the week ends.</div>`;
+  } else {
+    foot = `<div class="wk-hint">Reach 15 points this week for <b>1 hour</b> of free play — get to the chest at the end of the week to claim it.${isLast?" Final week — Aug 31 grand prizes!":""}</div>`;
+  }
 
   return `<div class="page wkpage">
     <div class="wk-head">
@@ -1081,7 +1126,7 @@ function recordSheet(){
   return `<div class="sheet-bg" id="sheetBg"><div class="sheet" id="sheet">
     <div class="grip"></div>
     <h3>Record today's visit</h3>
-    <p class="sh-sub">Enter your arcade's code.</p>
+    <p class="sh-sub">Enter your arena's code.</p>
     <input class="code-in" id="codeIn" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" />
     <div class="errline" id="codeErr"></div>
     <div class="worker-note">
@@ -1100,6 +1145,61 @@ function recordSheet(){
     <button class="btn fire" id="confirmCode" style="margin-top:18px">Confirm code</button>
     <button class="btn ghost" id="cancelCode" style="margin-top:8px">Cancel</button>
   </div></div>`;
+}
+
+/* =====================================================================
+   CLAIM SHEET — preuzimanje tjedne nagrade (škrinja) kodom arene.
+   Nakon preuzimanja škrinja se prikaže OTVORENA (radnik zna da je već dao nagradu).
+   ===================================================================== */
+let CLAIM_WEEK=null, vvHandler2=null;
+function claimSheet(){
+  return `<div class="sheet-bg" id="claimBg"><div class="sheet">
+    <div class="grip"></div>
+    <h3 id="claimTtl">Claim your reward</h3>
+    <p class="sh-sub" id="claimSub">Ask staff to enter your arena's code to open the chest.</p>
+    <input class="code-in" id="claimIn" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" />
+    <div class="errline" id="claimErr"></div>
+    <div class="worker-note"><span class="wi">🎁</span>
+      <div class="wt"><b>Staff:</b> enter the code to hand out this reward. The chest then shows as opened so you know it's been given.</div></div>
+    <button class="btn fire" id="confirmClaim" style="margin-top:18px">🗝️ Open chest</button>
+    <button class="btn ghost" id="cancelClaim" style="margin-top:8px">Cancel</button>
+  </div></div>`;
+}
+function fitClaimKb(){ const vv=window.visualViewport; if(!vv) return; const kb=Math.max(0,Math.round(window.innerHeight-vv.height-vv.offsetTop)); if(el("claimBg")) el("claimBg").style.paddingBottom = kb?kb+"px":""; }
+function openClaimSheet(weekIndex){
+  const w=ffCampaignWeeks().find(x=>x.index===weekIndex); if(!w) return;
+  CLAIM_WEEK=weekIndex;
+  const hrs=ffWeeklyRewardHours(ffWeekPoints(S.days,w));
+  el("claimTtl").textContent=`Claim Week ${weekIndex} reward`;
+  el("claimSub").textContent=`${hrs} ${hrs===1?"hour":"hours"} of free play. Ask staff to enter your arena's code.`;
+  el("claimIn").value=""; el("claimErr").textContent=""; el("claimIn").classList.remove("err");
+  el("claimBg").classList.add("on");
+  if(window.visualViewport){ vvHandler2=fitClaimKb; window.visualViewport.addEventListener("resize",vvHandler2); window.visualViewport.addEventListener("scroll",vvHandler2); }
+  setTimeout(()=>{ el("claimIn").focus(); fitClaimKb(); },320);
+}
+function closeClaimSheet(){
+  el("claimBg").classList.remove("on"); if(el("claimIn")) el("claimIn").blur(); CLAIM_WEEK=null;
+  if(window.visualViewport && vvHandler2){ window.visualViewport.removeEventListener("resize",vvHandler2); window.visualViewport.removeEventListener("scroll",vvHandler2); vvHandler2=null; }
+  if(el("claimBg")) el("claimBg").style.paddingBottom="";
+}
+function confirmClaim(){
+  const w=ffCampaignWeeks().find(x=>x.index===CLAIM_WEEK); if(!w) return;
+  const code=el("claimIn").value.trim();
+  if(!ffCheckCode(S.venueId, code)){ el("claimIn").classList.add("err"); el("claimErr").textContent="Wrong code. Check with a staff member."; return; }
+  const hrs=ffWeeklyRewardHours(ffWeekPoints(S.days,w)); const wk=CLAIM_WEEK;
+  if(!S.claims) S.claims={};
+  S.claims[wk]={ at:ffToday(), hours:hrs, code };
+  if(!save()){ delete S.claims[wk]; el("claimErr").textContent="Couldn't save. Turn off private/incognito mode and try again."; return; }
+  closeClaimSheet();
+  toast(`Reward claimed: ${hrs} ${hrs===1?"hour":"hours"} 🎉`);
+  buildPages();
+}
+function wireClaim(){
+  el("claimIn").addEventListener("input",()=>{ el("claimErr").textContent=""; el("claimIn").classList.remove("err"); });
+  el("claimIn").addEventListener("keydown",(e)=>{ if(e.key==="Enter"){ e.preventDefault(); confirmClaim(); } });
+  el("cancelClaim").onclick=closeClaimSheet;
+  el("confirmClaim").onclick=confirmClaim;
+  el("claimBg").onclick=(e)=>{ if(e.target===el("claimBg")) closeClaimSheet(); };
 }
 function successOverlay(){
   let sparks=""; for(let i=0;i<14;i++){ const a=i/14*6.283, dx=Math.cos(a)*(90+Math.random()*40), dy=Math.sin(a)*(90+Math.random()*40);
@@ -1223,7 +1323,8 @@ function showSuccess(rec){
 /* Ljestvica prikazuje ISKLJUČIVO stvarne rezultate. Bez servera app zna samo
    za igrača na OVOM uređaju, pa je prazna dok se ne skupi prvi bod. Kad se
    uključi živi zajednički feed (backend), ovdje se ubacuju i ostali igrači. */
-function myLiveScore(){ return S ? ffScore(S.days).total : 0; }
+// Rezultat za leaderboard = bodovi TEKUĆEG kruga (srpanj do 31.7., pa kolovoz od 1.8.).
+function myLiveScore(){ if(!S) return 0; const p=ffPeriodFor(ffToday()); return ffScoreRange(S.days, p.start, p.end); }
 
 let lbToken = 0;
 function buildLeaderboard(){
@@ -1245,6 +1346,8 @@ async function renderLbBody(){
   const body=el("lbBody"); if(!body) return;
   const myId = S ? S.playerId : null;
   const myScore = myLiveScore();
+  const period = ffPeriodFor(ffToday());
+  const since = period.start + "T00:00:00+02:00";   // tekući krug; granica = ponoć po CEST (sve FF arene su UTC+2 ljeti)
   const venOpts = FF_COUNTRIES.map(c=>`<optgroup label="${c.flag} ${c.label} · ${c.name}">${
     c.venues.map(v=>`<option value="${v.id}" ${v.id===LB_VENUE?"selected":""}>${esc(v.name)}</option>`).join("")
   }</optgroup>`).join("");
@@ -1262,12 +1365,12 @@ async function renderLbBody(){
   if(SB_ON){
     try{
       if(LB_MODE==="venues"){
-        const all = await sbAll();
+        const all = await sbAll(since);
         const map={};
         for(const r of all){ (map[r.venue_id] || (map[r.venue_id]={venue_id:r.venue_id,total:0})).total += (r.score||0); }
         venues = Object.values(map);
       } else {
-        players = await sbPlayers(LB_VENUE);
+        players = await sbPlayers(LB_VENUE, since);
       }
       live=true;
     }catch(e){ live=false; }
@@ -1284,10 +1387,10 @@ async function renderLbBody(){
       .sort((a,b)=>b.total-a.total);
     if(!rows.length){
       body.innerHTML = lbEmpty("No FF Arena has points yet",
-        "As players start collecting stamps, arenas climb here. Best FF Arena on Aug 31 wins 1 week of 50% off.");
+        `As players collect stamps, arenas climb here. Best arena of the ${period.label} wins a week of 50% off play in ${period.prizeMonth}.`);
       return;
     }
-    body.innerHTML = `<div class="lb-title">🏆 FF Arenas this summer · best one wins 1 week of 50% off</div>` +
+    body.innerHTML = `<div class="lb-title">🏆 FF Arenas · ${period.label} · best wins a week of 50% off in ${period.prizeMonth}</div>` +
       rows.map((v,i)=>rankRow(i+1, `${ffFlag(v.country)} ${esc(v.name)}`, esc(v.city), v.total, v.id===S.venueId, i===0?"🏟️ 50% off":"")).join("") +
       lbNote(live);
   } else {
@@ -1298,7 +1401,7 @@ async function renderLbBody(){
     }
     list = list.filter(p=>p.score>0).sort((a,b)=> (b.score-a.score) || ((b.me?1:0)-(a.me?1:0)));
     const ven=ffVenueById(LB_VENUE);
-    const header = venHeader + `<div class="lb-title">${ven?ffFlag(ven.country)+" "+esc(ven.name):""} · top players · Aug 31 prizes shown</div>`;
+    const header = venHeader + `<div class="lb-title">${ven?ffFlag(ven.country)+" "+esc(ven.name):""} · top players · ${period.label}</div>`;
     if(!list.length){
       body.innerHTML = header + lbEmpty(
         LB_VENUE===S.venueId ? "No points here yet — be the first!" : "No players here yet",
@@ -1331,8 +1434,9 @@ function lbEmpty(title, sub){
   </div>`;
 }
 function lbNote(live){
+  const p=ffPeriodFor(ffToday());
   return live
-    ? `<div class="lb-note">🔴 Live — updates as Friendly Fire players everywhere collect points. Prizes are handed out in the arcade.</div>`
+    ? `<div class="lb-note">🔴 Live · <b>${p.label}</b> — leaderboard resets on Aug 1. Winners are picked on Jul 31 and Aug 31; prizes are handed out in the arena.</div>`
     : `<div class="lb-note">You're offline — showing your own live score. The shared leaderboard updates when you're back online.</div>`;
 }
 
