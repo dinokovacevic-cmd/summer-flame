@@ -73,6 +73,20 @@ button{font-family:var(--font); cursor:pointer}
 .ahs-b b{color:var(--text)}
 .ahs-steps{font-size:12px;color:var(--gold2);margin-top:8px;line-height:1.5}
 .ahs-steps b{color:var(--text)}
+/* ---------- UPGRADE (stara verzija zaključana) ---------- */
+.upg{position:absolute;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:calc(28px + env(safe-area-inset-top)) 24px calc(28px + env(safe-area-inset-bottom));overflow-y:auto;text-align:center;
+  background:radial-gradient(120% 80% at 50% 0%,rgba(233,196,106,.10),transparent 55%),linear-gradient(160deg,#12172a 0%,#0a0d16 55%,#070a12 100%)}
+.upg .brand{font-family:var(--serif);letter-spacing:.14em;font-weight:700;font-size:14px;color:var(--gold);opacity:.9;margin-bottom:12px}
+.upg .title{font-family:var(--serif);font-weight:700;line-height:1.05;font-size:30px;margin:6px 0 4px;
+  background:linear-gradient(180deg,var(--gold2),var(--gold) 45%,var(--gold-deep));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.upg-card{width:100%;max-width:340px;margin:22px 0 14px;padding:20px 18px;border-radius:16px;
+  background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line2);box-shadow:var(--shadow)}
+.upg-h{font-family:var(--disp);font-weight:700;font-size:18px;color:var(--gold2)}
+.upg-b{font-size:13.5px;color:var(--muted);line-height:1.55;margin:8px 0 16px}
+.upg-card .btn{display:block;text-align:center;text-decoration:none;margin-top:0}
+.upg-link{font-family:var(--disp);font-weight:700;font-size:13px;color:var(--gold);margin-top:10px;letter-spacing:.02em}
+.upg-tip{font-size:12px;color:var(--muted2);max-width:320px;line-height:1.5;margin-top:6px}
 .field{width:100%;max-width:320px}
 .field label{display:block;font-size:12px;color:var(--muted);margin:0 0 8px 2px;letter-spacing:.04em}
 .input{
@@ -615,7 +629,26 @@ function flameSVG(){ return `<svg viewBox="0 0 24 24" fill="currentColor" aria-h
 /* =====================================================================
    RENDER ROOT
    ===================================================================== */
+/* 🔒 Stara verzija je premještena na novu profesionalnu aplikaciju. Kad se otvori,
+   prikaži SAMO ekran s linkom na novu app — sve ostalo je zaključano. */
+const FF_NEW_URL = "https://summer-flame.ffe.gg";
+function renderUpgrade(){
+  el("app").innerHTML = `
+  <div class="upg">
+    <div class="brand">FRIENDLY FIRE</div>
+    ${crestSVG(112)}
+    <div class="title">Summer<br/>Flame</div>
+    <div class="upg-card">
+      <div class="upg-h">✨ New version available</div>
+      <div class="upg-b">Summer Flame has moved to a new, improved app. This older version is no longer active — tap below to open the new one and keep collecting stamps.</div>
+      <a class="btn fire" href="${FF_NEW_URL}">Open the new Summer Flame →</a>
+      <div class="upg-link">${FF_NEW_URL.replace(/^https?:\/\//,"")}</div>
+    </div>
+    <div class="upg-tip">📲 On the new app, tap “Add to Home Screen” so it works like a real app.</div>
+  </div>`;
+}
 function render(){
+  renderUpgrade(); return;   // 🔒 stara verzija zaključana — sve vodi na novu app
   S = load();
   if(!S || !S.name){ renderCover(); return; }
   if(!S.playerId){ S.playerId = ffNewId(); save(); }   // migracija starih putovnica
