@@ -65,6 +65,14 @@ button{font-family:var(--font); cursor:pointer}
 .cover .sub{color:var(--muted);font-size:13px;letter-spacing:.05em;margin-bottom:30px;text-align:center}
 .cover .passport-word{font-family:var(--serif);color:rgba(233,196,106,.55);font-size:11px;
   letter-spacing:.42em;margin-top:26px;text-transform:uppercase}
+.cover.hasahs{justify-content:flex-start;overflow-y:auto;padding-top:calc(22px + env(safe-area-inset-top))}
+.ahs{width:100%;max-width:340px;margin:14px 0 12px;padding:14px 16px;border-radius:14px;text-align:left;
+  background:rgba(233,196,106,.1);border:1px solid rgba(233,196,106,.3)}
+.ahs-h{font-family:var(--disp);font-weight:700;font-size:15px;color:var(--gold2);letter-spacing:.02em}
+.ahs-b{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:6px}
+.ahs-b b{color:var(--text)}
+.ahs-steps{font-size:12px;color:var(--gold2);margin-top:8px;line-height:1.5}
+.ahs-steps b{color:var(--text)}
 .field{width:100%;max-width:320px}
 .field label{display:block;font-size:12px;color:var(--muted);margin:0 0 8px 2px;letter-spacing:.04em}
 .input{
@@ -617,15 +625,29 @@ function render(){
 }
 
 /* ---------- COVER ---------- */
+/* Radi li kao dodana na početni zaslon (PWA) ili u pregledniku? */
+function ffStandalone(){ try{ return (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone===true; }catch(e){ return false; } }
+function ffIsIOS(){ try{ return /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform==="MacIntel" && navigator.maxTouchPoints>1); }catch(e){ return false; } }
+
 function renderCover(){
+  // Na iPhoneu Safari i home-screen app imaju ODVOJENU pohranu → ako putovnicu napraviš
+  // u Safariju pa dodaš na zaslon, dobiješ drugu (praznu). Zato prvo navedi dodavanje.
+  const addFirst = ffIsIOS() && !ffStandalone();
+  const addCard = addFirst ? `
+    <div class="ahs">
+      <div class="ahs-h">📲 Add to Home Screen first</div>
+      <div class="ahs-b">On iPhone, Safari and the Home-Screen app keep <b>separate</b> data. Add this to your Home Screen and open it <b>from there</b> to make your passport — so it's saved in one place and you don't create it twice.</div>
+      <div class="ahs-steps"><b>Share</b> (□↑) → <b>Add to Home Screen</b> → open <b>Summer Flame</b> from the Home Screen.</div>
+    </div>` : "";
   el("app").innerHTML = `
-  <div class="cover" id="cover">
+  <div class="cover ${addFirst?"hasahs":""}" id="cover">
     <div class="brand">FRIENDLY FIRE</div>
-    ${crestSVG(112)}
+    ${crestSVG(addFirst?84:112)}
     <div class="title">Summer<br/>Flame</div>
     <div class="sub">Summer passport · 2026</div>
+    ${addCard}
     <div class="field">
-      <label>Your nickname or name</label>
+      <label>${addFirst?"Or type your name to continue in the browser":"Your nickname or name"}</label>
       <input class="input" id="nick" placeholder="e.g. Blitzy" autocomplete="off" maxlength="24" />
       <button class="btn" id="openBtn">Open passport</button>
     </div>
@@ -642,7 +664,7 @@ function renderCover(){
   };
   el("openBtn").onclick = go;
   nick.addEventListener("keydown",e=>{ if(e.key==="Enter") go(); });
-  setTimeout(()=>nick.focus(),400);
+  if(!addFirst) setTimeout(()=>nick.focus(),400);   // ne diži tipkovnicu preko prompta
 }
 
 /* ---------- VENUE PICKER ---------- */
