@@ -1368,9 +1368,14 @@ async function renderLbBody(){
     try{
       if(LB_MODE==="venues"){
         const all = await sbAll(since);
-        const map={};
-        for(const r of all){ (map[r.venue_id] || (map[r.venue_id]={venue_id:r.venue_id,total:0})).total += (r.score||0); }
-        venues = Object.values(map);
+        // po areni spoji isti nadimak (najbolji rezultat) pa zbroji → duple putovnice ne napuhuju total
+        const perVenue={};
+        for(const r of all){
+          const v=r.venue_id, k=(r.nickname||"").trim().toLowerCase()||r.player_id;
+          if(!perVenue[v]) perVenue[v]={};
+          perVenue[v][k] = Math.max(perVenue[v][k]||0, r.score||0);
+        }
+        venues = Object.entries(perVenue).map(([venue_id,nicks])=>({ venue_id, total:Object.values(nicks).reduce((a,b)=>a+b,0) }));
       } else {
         players = await sbPlayers(LB_VENUE, since);
       }
@@ -1396,12 +1401,20 @@ async function renderLbBody(){
       rows.map((v,i)=>rankRow(i+1, `${ffFlag(v.country)} ${esc(v.name)}`, esc(v.city), v.total, v.id===S.venueId, i===0?"🏟️ 50% off":"")).join("") +
       lbNote(live);
   } else {
-    let list = players.map(p=>({ id:p.player_id, name:p.nickname, score:p.score, me:(p.player_id===myId) }));
+    let raw = players.map(p=>({ id:p.player_id, name:p.nickname, score:p.score, me:(p.player_id===myId) }));
     if(LB_VENUE===S.venueId && myScore>0){
-      list = list.filter(p=>p.id!==myId);
-      list.push({ id:myId, name:S.name, score:myScore, me:true });
+      raw = raw.filter(p=>p.id!==myId);
+      raw.push({ id:myId, name:S.name, score:myScore, me:true });
     }
-    list = list.filter(p=>p.score>0).sort((a,b)=> (b.score-a.score) || ((b.me?1:0)-(a.me?1:0)));
+    // spoji isti nadimak u JEDAN red (ista osoba s dvije putovnice / isti nick) → najbolji rezultat
+    const byNick = new Map();
+    for(const p of raw){
+      const k = (p.name||"").trim().toLowerCase() || p.id;
+      const cur = byNick.get(k);
+      if(!cur) byNick.set(k, { name:p.name, score:p.score, me:!!p.me });
+      else { if(p.score>cur.score){ cur.score=p.score; cur.name=p.name; } if(p.me) cur.me=true; }
+    }
+    let list = [...byNick.values()].filter(p=>p.score>0).sort((a,b)=> (b.score-a.score) || ((b.me?1:0)-(a.me?1:0)));
     const ven=ffVenueById(LB_VENUE);
     const header = venHeader + `<div class="lb-title">${ven?ffFlag(ven.country)+" "+esc(ven.name):""} · top players · ${period.label}</div>`;
     if(!list.length){
