@@ -87,6 +87,7 @@ button{font-family:var(--font); cursor:pointer}
 .upg-card .btn{display:block;text-align:center;text-decoration:none;margin-top:0}
 .upg-link{font-family:var(--disp);font-weight:700;font-size:13px;color:var(--gold);margin-top:10px;letter-spacing:.02em}
 .upg-tip{font-size:12px;color:var(--muted2);max-width:320px;line-height:1.5;margin-top:6px}
+.upg-note{font-size:12px;color:var(--muted2);max-width:320px;line-height:1.5;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 .field{width:100%;max-width:320px}
 .field label{display:block;font-size:12px;color:var(--muted);margin:0 0 8px 2px;letter-spacing:.04em}
 .input{
@@ -645,6 +646,7 @@ function renderUpgrade(){
       <div class="upg-link">${FF_NEW_URL.replace(/^https?:\/\//,"")}</div>
     </div>
     <div class="upg-tip">📲 On the new app, tap “Add to Home Screen” so it works like a real app.</div>
+    <div class="upg-note">If your points didn't transfer correctly, please contact our staff.</div>
   </div>`;
 }
 function render(){
