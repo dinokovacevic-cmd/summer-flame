@@ -554,17 +554,30 @@ async function pushScore(){
     });
   }catch(e){ /* offline/greška — ljestvica se svejedno napuni pri idućem otvaranju */ }
 }
-/* Reset putovnice = ukloni svoj rezultat s leaderboarda. Anon ne može DELETE (RLS),
-   pa postavljamo score 0 → nestaje i iz Players i iz zbroja FF Arene. */
-async function sbResetMe(pid, vid){
-  if(!SB_ON || !pid) return;
+/* Reset putovnice = ukloni s leaderboarda (Players i zbroj arene). Anon ne može DELETE,
+   pa postavljamo score 0. Zeroira: (1) TOČNO ovaj red po player_id, i (2) SVE redove s
+   istim nadimkom u istoj areni — npr. ista osoba koja je prije radila više putovnica. */
+async function sbResetMe(pid, vid, nick){
+  if(!SB_ON) return;
+  const now = new Date().toISOString();
   try{
-    await fetch(`${SB_URL}/rest/v1/scores`, {
-      method:"POST",
-      headers:{ ...SB_HEADERS, "Prefer":"resolution=merge-duplicates" },
-      body: JSON.stringify({ player_id:pid, nickname:"(reset)", venue_id:vid||"none", score:0, updated_at:new Date().toISOString() })
-    });
-  }catch(e){ /* offline — rezultat će ostati dok se ponovno ne otvori online */ }
+    if(pid){
+      await fetch(`${SB_URL}/rest/v1/scores`, {
+        method:"POST",
+        headers:{ ...SB_HEADERS, "Prefer":"resolution=merge-duplicates" },
+        body: JSON.stringify({ player_id:pid, nickname:"(reset)", venue_id:vid||"none", score:0, updated_at:now })
+      });
+    }
+    const cn = (nick||"").trim();
+    if(cn && vid){
+      const q = `nickname=eq.${encodeURIComponent(cn)}&venue_id=eq.${encodeURIComponent(vid)}`;
+      await fetch(`${SB_URL}/rest/v1/scores?${q}`, {
+        method:"PATCH",
+        headers:{ ...SB_HEADERS },
+        body: JSON.stringify({ score:0, nickname:"(reset)", updated_at:now })
+      });
+    }
+  }catch(e){ /* offline — počistit će se kad se ponovno otvori online */ }
 }
 async function sbPlayers(venueId, since){
   const sinceQ = since ? `&updated_at=gte.${since}` : "";
@@ -722,8 +735,8 @@ function wireSettings(){
   el("setChangeVenue").onclick=()=>{ el("settingsBg").classList.remove("on"); renderPicker(S.venueId); };
   el("setReset").onclick=async ()=>{
     if(confirm("Reset passport? All your stamps and points will be deleted. This can't be undone.")){
-      const pid=S&&S.playerId, vid=S&&S.venueId;
-      await sbResetMe(pid, vid);      // makni i s leaderboarda prije lokalnog brisanja
+      const pid=S&&S.playerId, vid=S&&S.venueId, nick=S?cleanName(S.name):"";
+      await sbResetMe(pid, vid, nick);   // makni sebe (+ eventualne duple putovnice) s leaderboarda
       localStorage.removeItem(STORE_KEY); S=null; VIEW="passport"; render();
     }
   };
